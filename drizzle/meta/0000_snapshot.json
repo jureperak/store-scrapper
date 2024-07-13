@@ -1,0 +1,112 @@
+{
+  "id": "85d483bb-646d-419b-9084-96d848f37fb7",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.pages": {
+      "name": "pages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "article": {
+          "name": "article",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "availabilityUrl": {
+          "name": "availabilityUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "articleUrl": {
+          "name": "articleUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "neededSku": {
+          "name": "neededSku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notNeededSkus": {
+          "name": "notNeededSkus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdTime": {
+          "name": "createdTime",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "archivedTime": {
+          "name": "archivedTime",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uniqueAvailabilityUrlIdx": {
+          "name": "uniqueAvailabilityUrlIdx",
+          "columns": [
+            {
+              "expression": "availabilityUrl",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uniqueNeededSkuIdx": {
+          "name": "uniqueNeededSkuIdx",
+          "columns": [
+            {
+              "expression": "neededSku",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

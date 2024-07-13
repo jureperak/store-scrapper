@@ -25,8 +25,11 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { getPages, SelectPage } from "@/lib/db";
 
-export default function Component() {
+export default async function Home() {
+  const data = await getPages();
+
   return (
     <div className="flex min-h-screen w-full bg-muted/40">
       <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14 w-full">
@@ -95,35 +98,9 @@ export default function Component() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        kaput-od-manteco-vune-s-prorezima-zw
-                      </TableCell>
-                      <TableCell>322543084</TableCell>
-                      <TableCell>
-                        <Badge variant="default">Aktivno</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              aria-haspopup="true"
-                              size="icon"
-                              variant="ghost"
-                            >
-                              <MoveVerticalIcon className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Akcije</DropdownMenuLabel>
-                            <DropdownMenuItem>Uredi</DropdownMenuItem>
-                            <DropdownMenuItem>Deaktiviraj</DropdownMenuItem>
-                            <DropdownMenuItem>Obriši</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                    {data.map((x) => {
+                      return <TablePageRow key={x.id} page={x} />;
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -132,6 +109,38 @@ export default function Component() {
         </main>
       </div>
     </div>
+  );
+}
+
+interface TablePageRowProps {
+  page: SelectPage;
+}
+
+function TablePageRow({ page }: TablePageRowProps) {
+  return (
+    <TableRow>
+      <TableCell className="font-medium">{page.article}</TableCell>
+      <TableCell>{page.neededSku}</TableCell>
+      <TableCell>
+        <Badge variant="default">{page.status}</Badge>
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button aria-haspopup="true" size="icon" variant="ghost">
+              <MoveVerticalIcon className="h-4 w-4" />
+              <span className="sr-only">Toggle menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Akcije</DropdownMenuLabel>
+            <DropdownMenuItem>Uredi</DropdownMenuItem>
+            <DropdownMenuItem>Deaktiviraj</DropdownMenuItem>
+            <DropdownMenuItem>Obriši</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
   );
 }
 
