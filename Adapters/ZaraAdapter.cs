@@ -1,10 +1,6 @@
 using System.Text.Json;
-using Microsoft.Extensions.Options;
-using RestSharp;
-using RestSharp.Authenticators;
 using StoreScrapper.Models;
-using Twilio.Rest.Api.V2010.Account;
-using Twilio.Types;
+using StoreScrapper.Services;
 
 namespace StoreScrapper.Adapters;
 
@@ -12,18 +8,16 @@ public class ZaraAdapter : IStoreAdapter
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly List<int> _alreadySentNotifications;
-    private readonly TwilioOptions _twilioOptions;
-    private readonly MailgunOptions _mailgunOptions;
+    private readonly NotificationService _notificationService;
 
-    public ZaraAdapter(IHttpClientFactory httpClientFactory, List<int> alreadySentNotifications, IOptions<TwilioOptions> twilioOptions, IOptions<MailgunOptions> mailgunOptions)
+    public ZaraAdapter(IHttpClientFactory httpClientFactory, List<int> alreadySentNotifications, NotificationService notificationService)
     {
         _httpClientFactory = httpClientFactory;
         _alreadySentNotifications = alreadySentNotifications;
-        _twilioOptions = twilioOptions.Value;
-        _mailgunOptions = mailgunOptions.Value;
+        _notificationService = notificationService;
     }
 
-    public async Task<bool> FetchAndProcessAsync(string availabilityUrl, string productPageUrl)
+    public async Task<bool> FetchAndProcessAsync(string availabilityUrl, string productPageUrl, int? neededProduct, List<int> productsToAvoid)
     {
         var httpClient = _httpClientFactory.CreateClient();
         
@@ -38,52 +32,39 @@ public class ZaraAdapter : IStoreAdapter
         var webPageString = await httpResponseMessage.Content.ReadAsStringAsync();
         var model = JsonSerializer.Deserialize<ZaraModel>(webPageString)!;
 
-        var available = model.skusAvailability
+        var availableProducts = model.skusAvailability
             .Where(x => x.availability == "in_stock" )
             .Where(x => !_alreadySentNotifications.Contains(x.sku))
-            .FirstOrDefault();
-
-        if (available != null)
+            .ToList();
+        
+        if (neededProduct.HasValue)
         {
-            var task1 = NotifyMail(productPageUrl, available.sku.ToString());
-            var task2 = NotifyWhatsApp(productPageUrl, available.sku.ToString());
+            availableProducts = availableProducts
+                .Where(x => x.sku == neededProduct)
+                .ToList();
+        }
+
+        if (productsToAvoid.Any())
+        {
+            availableProducts = availableProducts
+                .Where(x => !productsToAvoid.Contains(x.sku))
+                .ToList();
+        }
+
+        if (availableProducts.Any())
+        {
+            var availableSkus = availableProducts
+                .Select(x => x.sku)
+                .ToList();
+
+            var task1 = _notificationService.SendMailAsync(productPageUrl, string.Join(", ", availableSkus));
+            var task2 = _notificationService.SendWhatsAppAsync(productPageUrl, string.Join(", ", availableSkus));
 
             await Task.WhenAll(task1, task2);
-            _alreadySentNotifications.Add(available.sku);
+
+            _alreadySentNotifications.AddRange(availableSkus);
         }
 
         return true;
-    }
-
-    private async Task NotifyMail(string link, string skuAvailable)
-    {
-        RestClient client = new RestClient(new Uri(_mailgunOptions.BaseUrl));
-        client.Authenticator = new HttpBasicAuthenticator("api", _mailgunOptions.ApiKey);
-
-        var recipients = _mailgunOptions.Recipients.Split(';');
-        
-        RestRequest request = new RestRequest();
-        request.AddParameter("domain", _mailgunOptions.Domain, ParameterType.UrlSegment);
-        request.Resource = "{domain}/messages";
-        request.AddParameter("from", $"Excited User <mailgun@{_mailgunOptions.Domain}>");
-        
-        foreach (var recipient in recipients)
-        {
-            request.AddParameter("to", recipient);
-        }
-        
-        request.AddParameter("text", $"Dostupan artikl {link}\nsku: {skuAvailable}");
-        request.AddParameter("subject", "Hurry!!!");
-        request.Method = Method.Post;
-        await client.ExecuteAsync(request);
-    }
-
-    private async Task NotifyWhatsApp(string link, string skuAvailable)
-    {
-        var messageOptions = new CreateMessageOptions(new PhoneNumber(_twilioOptions.SendToNumber));
-        messageOptions.From = new PhoneNumber(_twilioOptions.SendFromNumber);
-        messageOptions.Body = $"*Hurry!!!*\n{link}\n\n_{skuAvailable}_";
-
-        var message = await MessageResource.CreateAsync(messageOptions);
     }
 }

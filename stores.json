@@ -1,0 +1,11 @@
+{
+  "stores": [
+    {
+      "adapter": "Zara",
+      "availabilityUrl": "",
+      "productPageUrl": "",
+      "neededProduct": null,
+      "productsToAvoid": []
+    }
+  ]
+}

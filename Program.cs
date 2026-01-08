@@ -8,6 +8,7 @@ using Twilio;
 
 var configuration = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json")
+    .AddJsonFile("stores.json")
     .Build();
 
 // Create notification lists outside DI
@@ -18,18 +19,18 @@ var serviceProvider = new ServiceCollection()
     .AddHttpClient()
     .Configure<MailgunOptions>(configuration.GetSection(MailgunOptions.SectionName))
     .Configure<TwilioOptions>(configuration.GetSection(TwilioOptions.SectionName))
+    .Configure<StoreConfiguration>(configuration)
+    .AddSingleton<NotificationService>()
     // Register concrete adapter types as singletons
     .AddSingleton<ZaraAdapter>(sp => new ZaraAdapter(
         sp.GetRequiredService<IHttpClientFactory>(),
         alreadySentNotificationZara,
-        sp.GetRequiredService<IOptions<TwilioOptions>>(),
-        sp.GetRequiredService<IOptions<MailgunOptions>>()
+        sp.GetRequiredService<NotificationService>()
     ))
     .AddSingleton<PullAndBearAdapter>(sp => new PullAndBearAdapter(
         sp.GetRequiredService<IHttpClientFactory>(),
         alreadySentNotificationPullAndBear,
-        sp.GetRequiredService<IOptions<TwilioOptions>>(),
-        sp.GetRequiredService<IOptions<MailgunOptions>>()
+        sp.GetRequiredService<NotificationService>()
     ))
     .AddSingleton<StoreScrapperService>()
     .BuildServiceProvider();

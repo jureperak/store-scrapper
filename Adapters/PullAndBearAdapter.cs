@@ -1,8 +1,6 @@
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 using StoreScrapper.Models;
-using Twilio.Rest.Api.V2010.Account;
-using Twilio.Types;
+using StoreScrapper.Services;
 
 namespace StoreScrapper.Adapters;
 
@@ -10,18 +8,16 @@ public class PullAndBearAdapter : IStoreAdapter
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly List<int> _alreadySentNotifications;
-    private readonly TwilioOptions _twilioOptions;
-    private readonly MailgunOptions _mailgunOptions;
+    private readonly NotificationService _notificationService;
 
-    public PullAndBearAdapter(IHttpClientFactory httpClientFactory, List<int> alreadySentNotifications, IOptions<TwilioOptions> twilioOptions, IOptions<MailgunOptions> mailgunOptions)
+    public PullAndBearAdapter(IHttpClientFactory httpClientFactory, List<int> alreadySentNotifications, NotificationService notificationService)
     {
         _httpClientFactory = httpClientFactory;
         _alreadySentNotifications = alreadySentNotifications;
-        _twilioOptions = twilioOptions.Value;
-        _mailgunOptions = mailgunOptions.Value;
+        _notificationService = notificationService;
     }
 
-    public async Task<bool> FetchAndProcessAsync(string availabilityUrl, string productPageUrl)
+    public async Task<bool> FetchAndProcessAsync(string availabilityUrl, string productPageUrl, int? neededProduct, List<int> productsToAvoid)
     {
         var httpClient = _httpClientFactory.CreateClient();
         
@@ -36,27 +32,40 @@ public class PullAndBearAdapter : IStoreAdapter
         var webPageString = await httpResponseMessage.Content.ReadAsStringAsync();
         var model = JsonSerializer.Deserialize<PullAndBearModel>(webPageString)!;
 
-        var available = model.stocks
+        var availableProducts = model.stocks
             .SelectMany(x => x.stocks)
             .Where(x => x.availability == "in_stock" )
             .Where(x => !_alreadySentNotifications.Contains(x.id))
-            .FirstOrDefault();
-
-        if (available != null)
+            .ToList();
+        
+        if (neededProduct.HasValue)
         {
-            await NotifyWhatsApp(productPageUrl, available.id.ToString());
-            _alreadySentNotifications.Add(available.id);
+            availableProducts = availableProducts
+                .Where(x => x.id == neededProduct)
+                .ToList();
+        }
+
+        if (productsToAvoid.Any())
+        {
+            availableProducts = availableProducts
+                .Where(x => !productsToAvoid.Contains(x.id))
+                .ToList();
+        }
+
+        if (availableProducts.Any())
+        {
+            var availableSkus = availableProducts
+                .Select(x => x.id)
+                .ToList();
+
+            var task1 = _notificationService.SendMailAsync(productPageUrl, string.Join(", ", availableSkus));
+            var task2 = _notificationService.SendWhatsAppAsync(productPageUrl, string.Join(", ", availableSkus));
+
+            await Task.WhenAll(task1, task2);
+
+            _alreadySentNotifications.AddRange(availableSkus);
         }
 
         return true;
-    }
-
-    private async Task NotifyWhatsApp(string link, string skuAvailable)
-    {
-        var messageOptions = new CreateMessageOptions(new PhoneNumber(_twilioOptions.SendToNumber));
-        messageOptions.From = new PhoneNumber(_twilioOptions.SendFromNumber);
-        messageOptions.Body = $"*Hurry!!!*\n{link}\n\n_{skuAvailable}_";
-
-        var message = await MessageResource.CreateAsync(messageOptions);
     }
 }
