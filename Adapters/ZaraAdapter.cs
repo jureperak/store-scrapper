@@ -60,11 +60,18 @@ public class ZaraAdapter : IStoreAdapter
         RestClient client = new RestClient(new Uri(_mailgunOptions.BaseUrl));
         client.Authenticator = new HttpBasicAuthenticator("api", _mailgunOptions.ApiKey);
 
+        var recipients = _mailgunOptions.Recipients.Split(';');
+        
         RestRequest request = new RestRequest();
         request.AddParameter("domain", _mailgunOptions.Domain, ParameterType.UrlSegment);
         request.Resource = "{domain}/messages";
         request.AddParameter("from", $"Excited User <mailgun@{_mailgunOptions.Domain}>");
-        request.AddParameter("to", "jure.perak@hotmail.com");
+        
+        foreach (var recipient in recipients)
+        {
+            request.AddParameter("to", recipient);
+        }
+        
         request.AddParameter("text", $"Dostupan artikl {link}\nsku: {skuAvailable}");
         request.AddParameter("subject", "Hurry!!!");
         request.Method = Method.Post;
