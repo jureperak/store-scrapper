@@ -13,6 +13,10 @@
 /.next/
 /out/
 
+# build output folder for
+/bin
+/obj
+
 # production
 /build
 
@@ -34,3 +38,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# development appsettings
+appsettings.Development.json
