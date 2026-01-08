@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using StoreScrapper.Adapters;
 using StoreScrapper.Models;
-using StoreScrapper.Models.AdapterModels;
 using StoreScrapper.Services;
 using Twilio;
 

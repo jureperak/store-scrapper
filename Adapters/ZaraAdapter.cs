@@ -5,7 +5,6 @@ using RestSharp.Authenticators;
 using StoreScrapper.Models;
 using Twilio.Rest.Api.V2010.Account;
 using Twilio.Types;
-using StoreScrapper.Models.AdapterModels;
 
 namespace StoreScrapper.Adapters;
 

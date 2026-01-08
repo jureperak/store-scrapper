@@ -1,4 +1,4 @@
-namespace StoreScrapper.Models.AdapterModels;
+namespace StoreScrapper.Models;
 
 public class ZaraModel
 {
