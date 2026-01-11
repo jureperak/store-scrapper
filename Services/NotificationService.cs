@@ -4,6 +4,7 @@ using RestSharp;
 using RestSharp.Authenticators;
 using StoreScrapper.Data;
 using StoreScrapper.Models;
+using StoreScrapper.Models.Entities;
 using Twilio.Rest.Api.V2010.Account;
 using Twilio.Types;
 
@@ -11,9 +12,9 @@ namespace StoreScrapper.Services;
 
 public interface INotificationService
 {
-    Task<string> SendMailAsync(int productId, List<int> skuAvailable);
+    Task<string> SendMailAsync(int productId, List<ProductSku> skuAvailable);
     
-    Task<string> SendWhatsAppAsync(int productId, List<int> skuAvailable);
+    Task<string> SendWhatsAppAsync(int productId, List<ProductSku> skuAvailable);
 }
 
 public class NotificationService : INotificationService
@@ -29,11 +30,9 @@ public class NotificationService : INotificationService
         _mailgunOptions = mailgunOptions.Value;
     }
 
-    public async Task<string> SendMailAsync(int productId, List<int> skusAvailable)
+    public async Task<string> SendMailAsync(int productId, List<ProductSku> skusAvailable)
     {
         var product = await _appDbContext.Products
-            .Include(x => x.ProductSkus.Where(y => skusAvailable.Contains(y.Id)))
-                .ThenInclude(x => x.ProductSkuReActivations.Where(y => !y.IsUsed ))
             .Where(x => x.Id == productId)
             .FirstAsync();
         
@@ -52,31 +51,29 @@ public class NotificationService : INotificationService
             request.AddParameter("to", recipient);
         }
 
-        var skuOrSkus = product.ProductSkus.Count > 1 ? "skus" : "sku";
-        var skuAvailable = string.Join("\n", product.ProductSkus
+        var skuOrSkus = skusAvailable.Count > 1 ? "skus" : "sku";
+        var skuAvailable = string.Join("\n", skusAvailable
             .Select(x => $"{x.Name}: {x.Sku} => We will disable sending for this SKU until you reactivate at {x.ProductSkuReActivations.Single().ReEnableUrl}. You can reactivate in 30minutes. ({DateTime.UtcNow.AddMinutes(30):u})"));
 
         var body = $"Dostupno:\n{product.ProductPageUrl}\n\n{skuOrSkus}:\n{skuAvailable}";
         request.AddParameter("text", body);
         request.AddParameter("subject", $"Hurry!!! {product.Id}");
-        await client.ExecuteAsync(request);
+        var response = await client.ExecuteAsync(request);
 
         return body;
     }
 
-    public async Task<string> SendWhatsAppAsync(int productId, List<int> skusAvailable)
+    public async Task<string> SendWhatsAppAsync(int productId, List<ProductSku> skusAvailable)
     {
         var product = await _appDbContext.Products
-            .Include(x => x.ProductSkus.Where(y => skusAvailable.Contains(y.Id)))
-            .ThenInclude(x => x.ProductSkuReActivations.Where(y => !y.IsUsed ))
             .Where(x => x.Id == productId)
             .FirstAsync();
         
         var messageOptions = new CreateMessageOptions(new PhoneNumber(_twilioOptions.SendToNumber));
         messageOptions.From = new PhoneNumber(_twilioOptions.SendFromNumber);
         
-        var skuOrSkus = product.ProductSkus.Count > 1 ? "skus" : "sku";
-        var skuAvailable = string.Join("\n", product.ProductSkus
+        var skuOrSkus = skusAvailable.Count > 1 ? "skus" : "sku";
+        var skuAvailable = string.Join("\n", skusAvailable
             .Select(x => $"{x.Name}: _{x.Sku}_ => We will disable sending for this SKU until you reactivate at {x.ProductSkuReActivations.Single().ReEnableUrl}. You can reactivate in 30minutes. ({DateTime.UtcNow.AddMinutes(30):u})"));
         
         messageOptions.Body = $"*Hurry!!!*\n\nDostupno:\n{product.ProductPageUrl}\n\n{skuOrSkus}:\n{skuAvailable}";

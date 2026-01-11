@@ -4,6 +4,7 @@ using StoreScrapper.Data;
 using StoreScrapper.Jobs;
 using StoreScrapper.Models.Entities;
 using StoreScrapper.Models.ViewModels;
+using StoreScrapper.Services;
 
 namespace StoreScrapper.Controllers;
 
@@ -11,11 +12,13 @@ public class ProductController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly HangfireJobManager _jobManager;
+    private readonly IProductPageScraperService _scraperService;
 
-    public ProductController(AppDbContext dbContext, HangfireJobManager jobManager)
+    public ProductController(AppDbContext dbContext, HangfireJobManager jobManager, IProductPageScraperService scraperService)
     {
         _dbContext = dbContext;
         _jobManager = jobManager;
+        _scraperService = scraperService;
     }
 
     // GET: /Stores
@@ -55,18 +58,53 @@ public class ProductController : Controller
             return View(model);
         }
 
+        Console.WriteLine($"Creating product with AvailabilityUrl: {model.AvailabilityUrl ?? "NULL"}");
+
         var product = new Product
         {
             AdapterId = adapter.Id,
-            AvailabilityUrl = model.AvailabilityUrl,
+            AvailabilityUrl = model.AvailabilityUrl ?? string.Empty,
             ProductPageUrl = model.ProductPageUrl,
+            Name = model.ProductName ?? "Unknown Product",
             IsEnabled = model.IsEnabled,
             CheckIntervalSeconds = 5,
             CreatedAt = DateTime.UtcNow,
             ProductSkus = new()
         };
-        
-        // product.ProductSkus.AddRange(model.);
+
+        // Parse and add selected SKUs as ProductSkus
+        if (!string.IsNullOrWhiteSpace(model.SelectedSkusJson))
+        {
+            try
+            {
+                Console.WriteLine($"SelectedSkusJson received: {model.SelectedSkusJson}");
+                var selectedSkus = System.Text.Json.JsonSerializer.Deserialize<List<SkuData>>(model.SelectedSkusJson);
+                Console.WriteLine($"Deserialized {selectedSkus?.Count ?? 0} SKUs");
+                if (selectedSkus != null)
+                {
+                    foreach (var skuData in selectedSkus)
+                    {
+                        Console.WriteLine($"Adding SKU: Name={skuData.Name}, Sku={skuData.Sku}");
+                        product.ProductSkus.Add(new ProductSku
+                        {
+                            Name = skuData.Name,
+                            Sku = skuData.Sku,
+                            CreatedAt = DateTime.UtcNow,
+                            TemporaryDisabled = false
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error parsing SKUs: {ex.Message}");
+                // Ignore JSON parsing errors
+            }
+        }
+        else
+        {
+            Console.WriteLine("SelectedSkusJson is null or empty");
+        }
 
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -84,13 +122,20 @@ public class ProductController : Controller
     {
         var product = await _dbContext.Products
             .Include(x => x.Adapter)
+            .Include(x => x.ProductSkus)
             .Where(x => x.Id == id)
             .FirstOrDefaultAsync();
-            
+
         if (product == null)
         {
             return NotFound();
         }
+
+        var selectedSkus = product.ProductSkus.Select(s => new SkuData
+        {
+            Name = s.Name,
+            Sku = s.Sku
+        }).ToList();
 
         var viewModel = new ProductFormViewModel
         {
@@ -98,7 +143,9 @@ public class ProductController : Controller
             Adapter = product.Adapter.Name,
             AvailabilityUrl = product.AvailabilityUrl,
             ProductPageUrl = product.ProductPageUrl,
-            IsEnabled = product.IsEnabled
+            ProductName = product.Name,
+            IsEnabled = product.IsEnabled,
+            SelectedSkusJson = System.Text.Json.JsonSerializer.Serialize(selectedSkus)
         };
 
         return View(viewModel);
@@ -120,18 +167,19 @@ public class ProductController : Controller
         }
 
         var product = await _dbContext.Products
+            .Include(x => x.ProductSkus)
             .Where(x => x.Id == id)
             .FirstOrDefaultAsync();
-        
+
         if (product == null)
         {
             return NotFound();
         }
-        
+
         var adapter = await _dbContext.Adapters
             .Where(x => x.Name == model.Adapter)
             .FirstOrDefaultAsync();
-        
+
         if (adapter == null)
         {
             ModelState.AddModelError("Adapter", $"Adapter {model.Adapter} not found!");
@@ -140,10 +188,41 @@ public class ProductController : Controller
 
         // Update store properties
         product.AdapterId = adapter.Id;
-        product.AvailabilityUrl = model.AvailabilityUrl;
+        product.AvailabilityUrl = model.AvailabilityUrl ?? product.AvailabilityUrl;
         product.ProductPageUrl = model.ProductPageUrl;
+        product.Name = model.ProductName ?? product.Name;
         product.IsEnabled = model.IsEnabled;
         product.UpdatedAt = DateTime.UtcNow;
+
+        // Update ProductSkus
+        if (!string.IsNullOrWhiteSpace(model.SelectedSkusJson))
+        {
+            try
+            {
+                var selectedSkus = System.Text.Json.JsonSerializer.Deserialize<List<SkuData>>(model.SelectedSkusJson);
+                if (selectedSkus != null)
+                {
+                    // Remove all existing ProductSkus
+                    _dbContext.ProductSkus.RemoveRange(product.ProductSkus);
+
+                    // Add new ones
+                    foreach (var skuData in selectedSkus)
+                    {
+                        product.ProductSkus.Add(new ProductSku
+                        {
+                            Name = skuData.Name,
+                            Sku = skuData.Sku,
+                            CreatedAt = DateTime.UtcNow,
+                            TemporaryDisabled = false
+                        });
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore JSON parsing errors
+            }
+        }
 
         // Reschedule Hangfire job with new settings
         _jobManager.ScheduleStoreJob(product);
@@ -205,4 +284,64 @@ public class ProductController : Controller
         TempData["Success"] = $"Product {(product.IsEnabled ? "enabled" : "disabled")} successfully!";
         return RedirectToAction(nameof(Index));
     }
+
+    // POST: /Product/ScrapeProductPage
+    [HttpPost]
+    public async Task<IActionResult> ScrapeProductPage([FromBody] ScrapeProductPageRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Url))
+        {
+            return BadRequest(new { success = false, message = "URL is required" });
+        }
+
+        try
+        {
+            var result = await _scraperService.ScrapeProductPageAsync(request.Url);
+
+            if (!result.Success)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = result.ErrorMessage ?? "Failed to scrape product page"
+                });
+            }
+
+            Console.WriteLine($"Scraper result - AvailabilityUrl: {result.AvailabilityUrl ?? "NULL"}");
+
+            return Ok(new
+            {
+                success = true,
+                productId = result.ProductId,
+                productName = result.ProductName,
+                availabilityUrl = result.AvailabilityUrl,
+                availableSkus = result.AvailableSkus,
+                availableSizes = result.AvailableSizes,
+                // Also pass full product name for saving
+                fullProductName = result.ProductName
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                success = false,
+                message = $"Server error: {ex.Message}"
+            });
+        }
+    }
+}
+
+public class ScrapeProductPageRequest
+{
+    public string Url { get; set; } = string.Empty;
+}
+
+public class SkuData
+{
+    [System.Text.Json.Serialization.JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [System.Text.Json.Serialization.JsonPropertyName("sku")]
+    public int Sku { get; set; }
 }

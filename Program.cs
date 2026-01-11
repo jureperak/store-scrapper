@@ -48,6 +48,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddTransient<INotificationService, NotificationService>();
 builder.Services.AddSingleton<HangfireJobManager>();
 builder.Services.AddTransient<IStoreScrapingService, StoreScrapingService>();
+builder.Services.AddTransient<IProductPageScraperService, ProductPageScraperService>();
 
 // Register adapters as scoped
 builder.Services.AddTransient<IZaraAdapter, ZaraAdapter>();
@@ -83,10 +84,6 @@ app.MapControllerRoute(
 
 var twilioOptions = builder.Configuration.GetSection(TwilioOptions.SectionName).Get<TwilioOptions>();
 TwilioClient.Init(twilioOptions!.AccountSid, twilioOptions!.AccountToken);
-
-Console.WriteLine("Store Scrapper Web Application started.");
-Console.WriteLine($"Application URL: {app.Urls.FirstOrDefault() ?? "http://localhost:5000"}");
-Console.WriteLine($"Hangfire Dashboard: {app.Urls.FirstOrDefault() ?? "http://localhost:5000"}/hangfire");
 
 app.Run();
 

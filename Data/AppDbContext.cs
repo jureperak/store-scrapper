@@ -25,6 +25,10 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Global query filter to exclude archived products
+        modelBuilder.Entity<Product>()
+            .HasQueryFilter(p => p.ArchivedAt == null);
+
         // Seed Adapter data
         modelBuilder.Entity<Adapter>().HasData(
             new Adapter

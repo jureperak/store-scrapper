@@ -213,6 +213,11 @@ namespace StoreScrapper.Data.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_enabled");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
                     b.Property<string>("ProductPageUrl")
                         .IsRequired()
                         .HasColumnType("text")

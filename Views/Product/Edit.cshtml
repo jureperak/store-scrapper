@@ -4,11 +4,75 @@
     ViewData["Title"] = "Edit Product";
 }
 
+<style>
+    .size-toggle-btn {
+        min-width: 70px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border: 2px solid #dee2e6;
+        background-color: white;
+        color: #6c757d;
+        position: relative;
+    }
+
+    .size-toggle-btn:not(.active) {
+        opacity: 0.6;
+    }
+
+    .size-toggle-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .size-toggle-btn.active {
+        background-color: #0d6efd;
+        color: white !important;
+        border-color: #0d6efd;
+        opacity: 1;
+    }
+
+    .size-toggle-btn.active:hover {
+        background-color: #0b5ed7;
+        border-color: #0b5ed7;
+        color: white !important;
+    }
+
+    /* New SKU styling */
+    .size-toggle-btn.new-sku {
+        border-color: #198754;
+    }
+
+    .size-toggle-btn.new-sku.active {
+        background-color: #198754;
+        border-color: #198754;
+    }
+
+    .size-toggle-btn.new-sku.active:hover {
+        background-color: #157347;
+        border-color: #157347;
+    }
+
+    .new-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background-color: #198754;
+        color: white;
+        font-size: 9px;
+        font-weight: bold;
+        padding: 2px 4px;
+        border-radius: 3px;
+        line-height: 1;
+    }
+</style>
+
 <h1>Edit Product #@Model.Id</h1>
 
-<form asp-action="Edit" method="post" class="mt-4">
+<form asp-action="Edit" method="post" class="mt-4" id="productForm">
     @Html.AntiForgeryToken()
     <input type="hidden" asp-for="Id" />
+    <input type="hidden" asp-for="SelectedSkusJson" id="selectedSkusJson" />
+    <input type="hidden" asp-for="ProductName" id="productName" />
 
     <div class="mb-3">
         <label asp-for="Adapter" class="form-label"></label>
@@ -19,18 +83,45 @@
         <span asp-validation-for="Adapter" class="text-danger"></span>
     </div>
 
-    <div class="mb-3">
+    <div class="mb-3 d-none">
         <label asp-for="AvailabilityUrl" class="form-label"></label>
-        <input asp-for="AvailabilityUrl" class="form-control" />
+        <input asp-for="AvailabilityUrl" id="AvailabilityUrl" class="form-control" />
         <span asp-validation-for="AvailabilityUrl" class="text-danger"></span>
         <div class="form-text">The API endpoint that returns product availability</div>
     </div>
 
     <div class="mb-3">
         <label asp-for="ProductPageUrl" class="form-label"></label>
-        <input asp-for="ProductPageUrl" class="form-control" />
+        <div class="input-group">
+            <input asp-for="ProductPageUrl" id="productPageUrl" class="form-control" placeholder="https://www.zara.com/hr/hr/product..." />
+            <button type="button" id="scrapeBtn" class="btn btn-outline-secondary">
+                <span id="scrapeSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                <span id="scrapeBtnText">Scrape</span>
+            </button>
+        </div>
         <span asp-validation-for="ProductPageUrl" class="text-danger"></span>
         <div class="form-text">The product page URL that will be sent in notifications</div>
+    </div>
+
+    <!-- Scraper Results -->
+    <div id="scraperResults" class="alert alert-info d-none mb-3">
+        <h6>Scraped Data:</h6>
+        <div id="scraperResultsContent"></div>
+    </div>
+
+    <div id="scraperError" class="alert alert-danger d-none mb-3"></div>
+
+    <!-- Sizes Selection -->
+    <div id="sizesSection" class="mb-3 d-none">
+        <label class="form-label">Available Sizes</label>
+        <div class="mb-2">
+            <button type="button" id="selectAllSizes" class="btn btn-sm btn-outline-primary me-2">Select All</button>
+            <button type="button" id="deselectAllSizes" class="btn btn-sm btn-outline-secondary">Deselect All</button>
+        </div>
+        <div id="sizesContainer" class="d-flex flex-wrap gap-2">
+            <!-- Size buttons will be populated here -->
+        </div>
+        <div class="form-text mt-2">Click to select/deselect sizes you want to monitor</div>
     </div>
 
     <div class="mb-3 form-check">
@@ -47,4 +138,224 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const productPageUrlInput = document.getElementById('productPageUrl');
+            const scrapeBtn = document.getElementById('scrapeBtn');
+            const scrapeBtnText = document.getElementById('scrapeBtnText');
+            const scrapeSpinner = document.getElementById('scrapeSpinner');
+            const scraperResults = document.getElementById('scraperResults');
+            const scraperResultsContent = document.getElementById('scraperResultsContent');
+            const scraperError = document.getElementById('scraperError');
+            const availabilityUrlInput = document.getElementById('AvailabilityUrl');
+            const sizesSection = document.getElementById('sizesSection');
+            const sizesContainer = document.getElementById('sizesContainer');
+            const selectAllSizesBtn = document.getElementById('selectAllSizes');
+            const deselectAllSizesBtn = document.getElementById('deselectAllSizes');
+            const productForm = document.getElementById('productForm');
+            const selectedSkusJsonInput = document.getElementById('selectedSkusJson');
+            const productNameInput = document.getElementById('productName');
+
+            // Store existing SKUs for comparison
+            let existingSkuNames = [];
+
+            // Load existing selected SKUs on page load
+            const existingSkusJson = selectedSkusJsonInput.value;
+            if (existingSkusJson && existingSkusJson !== '[]') {
+                try {
+                    const existingSkus = JSON.parse(existingSkusJson);
+                    if (existingSkus && existingSkus.length > 0) {
+                        // Store existing SKU names for comparison later
+                        existingSkuNames = existingSkus.map(s => s.name);
+
+                        // Display the sizes section
+                        let sizesHtml = '';
+                        existingSkus.forEach(skuData => {
+                            sizesHtml += `
+                                <button type="button" class="btn size-toggle-btn active"
+                                        data-size="${skuData.name}"
+                                        data-sku="${skuData.sku}">
+                                    <i class="bi bi-check-circle-fill me-1"></i>${skuData.name}
+                                </button>
+                            `;
+                        });
+                        sizesContainer.innerHTML = sizesHtml;
+
+                        // Add click handlers to size buttons
+                        document.querySelectorAll('.size-toggle-btn').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                this.classList.toggle('active');
+                                const icon = this.querySelector('i');
+                                if (this.classList.contains('active')) {
+                                    icon.classList.remove('bi-circle');
+                                    icon.classList.add('bi-check-circle-fill');
+                                } else {
+                                    icon.classList.remove('bi-check-circle-fill');
+                                    icon.classList.add('bi-circle');
+                                }
+                            });
+                        });
+
+                        sizesSection.classList.remove('d-none');
+                    }
+                } catch (e) {
+                    console.error('Error parsing existing SKUs:', e);
+                }
+            }
+
+            scrapeBtn.addEventListener('click', async function() {
+                const url = productPageUrlInput.value.trim();
+
+                if (!url) {
+                    scraperError.textContent = 'Please enter a product page URL first.';
+                    scraperError.classList.remove('d-none');
+                    scraperResults.classList.add('d-none');
+                    return;
+                }
+
+                // Show loading state
+                scrapeBtn.disabled = true;
+                scrapeBtnText.textContent = 'Scraping...';
+                scrapeSpinner.classList.remove('d-none');
+                scraperResults.classList.add('d-none');
+                scraperError.classList.add('d-none');
+
+                try {
+                    const response = await fetch('/Product/ScrapeProductPage', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ url: url })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        let html = '<ul class="mb-0">';
+
+                        if (data.productId) {
+                            html += `<li><strong>Product ID:</strong> ${data.productId}</li>`;
+                        }
+
+                        if (data.productName) {
+                            html += `<li><strong>Product Name:</strong> ${data.productName}</li>`;
+                            // Save product name to hidden field
+                            productNameInput.value = data.productName;
+                        }
+
+                        if (data.availabilityUrl) {
+                            html += `<li><strong>Availability URL:</strong> <code class="small">${data.availabilityUrl}</code></li>`;
+                            // Auto-fill the availability URL field
+                            availabilityUrlInput.value = data.availabilityUrl;
+                        }
+
+                        if (data.availableSkus && data.availableSkus.length > 0) {
+                            html += `<li><strong>Available SKUs:</strong><ul>`;
+                            data.availableSkus.forEach(sku => {
+                                html += `<li>${sku.name} (SKU: ${sku.sku})</li>`;
+                            });
+                            html += `</ul></li>`;
+                        }
+
+                        // Use availableSkus if available (has SKU numbers), otherwise fall back to availableSizes
+                        const skusToDisplay = data.availableSkus && data.availableSkus.length > 0
+                            ? data.availableSkus
+                            : (data.availableSizes || []).map(size => ({ name: size, sku: 0 }));
+
+                        if (skusToDisplay.length > 0) {
+                            const sizeNames = skusToDisplay.map(s => s.name).join(', ');
+                            html += `<li><strong>Available Sizes:</strong> ${sizeNames}</li>`;
+
+                            // Populate sizes as toggle buttons with SKU data
+                            let sizesHtml = '';
+                            skusToDisplay.forEach(skuInfo => {
+                                const isNew = !existingSkuNames.includes(skuInfo.name);
+                                const newClass = isNew ? 'new-sku' : '';
+                                const newBadge = isNew ? '<span class="new-badge">NEW</span>' : '';
+
+                                sizesHtml += `
+                                    <button type="button" class="btn size-toggle-btn active ${newClass}"
+                                            data-size="${skuInfo.name}"
+                                            data-sku="${skuInfo.sku}">
+                                        <i class="bi bi-check-circle-fill me-1"></i>${skuInfo.name}
+                                        ${newBadge}
+                                    </button>
+                                `;
+                            });
+                            sizesContainer.innerHTML = sizesHtml;
+
+                            // Add click handlers to size buttons
+                            document.querySelectorAll('.size-toggle-btn').forEach(btn => {
+                                btn.addEventListener('click', function() {
+                                    this.classList.toggle('active');
+                                    const icon = this.querySelector('i');
+                                    if (this.classList.contains('active')) {
+                                        icon.classList.remove('bi-circle');
+                                        icon.classList.add('bi-check-circle-fill');
+                                    } else {
+                                        icon.classList.remove('bi-check-circle-fill');
+                                        icon.classList.add('bi-circle');
+                                    }
+                                });
+                            });
+
+                            sizesSection.classList.remove('d-none');
+                        }
+
+                        html += '</ul>';
+
+                        scraperResultsContent.innerHTML = html;
+                        scraperResults.classList.remove('d-none');
+                    } else {
+                        scraperError.textContent = data.message || 'Failed to scrape the product page.';
+                        scraperError.classList.remove('d-none');
+                    }
+                } catch (error) {
+                    scraperError.textContent = 'Error: ' + error.message;
+                    scraperError.classList.remove('d-none');
+                } finally {
+                    // Reset button state
+                    scrapeBtn.disabled = false;
+                    scrapeBtnText.textContent = 'Scrape';
+                    scrapeSpinner.classList.add('d-none');
+                }
+            });
+
+            // Select All Sizes button
+            selectAllSizesBtn.addEventListener('click', function() {
+                document.querySelectorAll('.size-toggle-btn').forEach(btn => {
+                    btn.classList.add('active');
+                    const icon = btn.querySelector('i');
+                    icon.classList.remove('bi-circle');
+                    icon.classList.add('bi-check-circle-fill');
+                });
+            });
+
+            // Deselect All Sizes button
+            deselectAllSizesBtn.addEventListener('click', function() {
+                document.querySelectorAll('.size-toggle-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    const icon = btn.querySelector('i');
+                    icon.classList.remove('bi-check-circle-fill');
+                    icon.classList.add('bi-circle');
+                });
+            });
+
+            // Before form submission, collect selected SKUs
+            productForm.addEventListener('submit', function(e) {
+                const selectedSkus = [];
+                document.querySelectorAll('.size-toggle-btn.active').forEach(btn => {
+                    const sizeName = btn.getAttribute('data-size');
+                    const skuNumber = btn.getAttribute('data-sku');
+                    selectedSkus.push({
+                        name: sizeName,
+                        sku: parseInt(skuNumber) || 0
+                    });
+                });
+                selectedSkusJsonInput.value = JSON.stringify(selectedSkus);
+            });
+        });
+    </script>
 }

@@ -105,15 +105,11 @@ public class StoreScrapingService : IStoreScrapingService
                     });
                 }
                 
-                var skusToNotify = productSkusFound
-                    .Select(x => x.Id)
-                    .ToList();
-                
                 try
                 {
                     // Send notification
-                    var emailBody = await _notificationService.SendMailAsync(product.Id, skusToNotify);
-                    var whatsAppBody = await _notificationService.SendWhatsAppAsync(product.Id, skusToNotify);
+                    var emailBody = await _notificationService.SendMailAsync(product.Id, productSkusFound);
+                    var whatsAppBody = await _notificationService.SendWhatsAppAsync(product.Id, productSkusFound);
 
                     // Record in database
                     notificationHistory = new NotificationHistory

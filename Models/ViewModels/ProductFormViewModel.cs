@@ -10,16 +10,20 @@ public class ProductFormViewModel
     [Display(Name = "Store Adapter")]
     public string Adapter { get; set; } = "Zara";
 
-    [Required]
     [Display(Name = "Availability URL")]
-    [Url]
-    public string AvailabilityUrl { get; set; } = string.Empty;
+    public string? AvailabilityUrl { get; set; }
 
     [Required]
     [Display(Name = "Product Page URL")]
     [Url]
     public string ProductPageUrl { get; set; } = string.Empty;
 
+    [Display(Name = "Product Name")]
+    public string? ProductName { get; set; }
+
     [Display(Name = "Enabled")]
     public bool IsEnabled { get; set; } = true;
+
+    // Selected SKUs with both name and SKU number (to be posted as JSON from client)
+    public string? SelectedSkusJson { get; set; }
 }
