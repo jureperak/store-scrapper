@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StoreScrapper.Adapters;
 using StoreScrapper.Data;
 using StoreScrapper.Models;
@@ -15,16 +16,18 @@ public interface IStoreScrapingService
 public class StoreScrapingService : IStoreScrapingService
 {
     private readonly AppDbContext _dbContext;
+    private readonly AppOptions _appOptions;
     private readonly INotificationService _notificationService;
     private readonly IZaraAdapter _zaraAdapter;
     private readonly IPullAndBearAdapter _pullAndBearAdapter;
 
-    public StoreScrapingService(AppDbContext dbContext,INotificationService notificationService,IZaraAdapter zaraAdapter,IPullAndBearAdapter pullAndBearAdapter)
+    public StoreScrapingService(AppDbContext dbContext, INotificationService notificationService,IZaraAdapter zaraAdapter,IPullAndBearAdapter pullAndBearAdapter, IOptions<AppOptions> appOptions)
     {
         _dbContext = dbContext;
         _notificationService = notificationService;
         _zaraAdapter = zaraAdapter;
         _pullAndBearAdapter = pullAndBearAdapter;
+        _appOptions = appOptions.Value;
     }
 
     public async Task<ScrapingResult> ScrapeStoreAsync(int productId)
@@ -33,8 +36,10 @@ public class StoreScrapingService : IStoreScrapingService
         {
             // 1. Load product from database
             var product = await _dbContext.Products
-                .Include(p => p.ProductSkus)
-                .Include(p => p.Adapter)
+                .Include(x => x.ProductSkus
+                    .Where(y => !y.TemporaryDisabled))
+                .ThenInclude(x => x.ProductSkuReActivations)
+                .Include(x => x.Adapter)                
                 .Where(x => x.Id == productId)
                 .FirstOrDefaultAsync();
             
@@ -56,16 +61,10 @@ public class StoreScrapingService : IStoreScrapingService
                 await LogExecutionAsync(productId, false, $"Unknown adapter: {product.Adapter}", null, []);
                 return ScrapingResult.CreateError($"Unknown adapter: {product.Adapter.Name}");
             }
-
-            // 3. Check if products were already notified
-            var alreadyNotified = await _dbContext.NotificationHistory
-                .Where(n => n.ProductId == product.Id)
-                .Where(n => n.SentAt.AddMinutes(3) > DateTime.UtcNow)
-                .AnyAsync();
             
-            if(alreadyNotified)
+            if(!product.ProductSkus.Any())
             {
-                return ScrapingResult.CreateSkipped("Products were already notified recently");
+                return ScrapingResult.CreateSkipped("There are no active SKUs to check");
             }
 
             // 5. Execute scraping
@@ -82,16 +81,39 @@ public class StoreScrapingService : IStoreScrapingService
             // 6. Send notifications for new products
             if (result.AvailableProductSkus.Any())
             {
-                var skusToNotify = product.ProductSkus
+                
+                var productSkusFound = product.ProductSkus
                     .Where(x => result.AvailableProductSkus.Contains(x.Sku))
-                    .Select(x => (x.Sku, x.Name))
+                    .ToList();
+                
+                foreach (var productSku in productSkusFound)
+                {
+                    productSku.TemporaryDisabled = true;
+                    productSku.UpdatedAt = DateTime.UtcNow;
+                    
+                    foreach (var productSkuProductSkuReActivation in productSku.ProductSkuReActivations)
+                    {
+                        productSkuProductSkuReActivation.IsUsed = true;
+                    }
+                    
+                    productSku.ProductSkuReActivations.Add(new ProductSkuReActivation()
+                    {
+                        CreatedAt = DateTime.UtcNow,
+                        ReEnableUrl = $"{_appOptions.BaseUrl}/api/productsku/{Guid.NewGuid()}/reactivate",
+                        ValidTo = DateTime.UtcNow.AddMinutes(30),
+                        IsUsed = false,
+                    });
+                }
+                
+                var skusToNotify = productSkusFound
+                    .Select(x => x.Id)
                     .ToList();
                 
                 try
                 {
                     // Send notification
-                    var emailBody = await _notificationService.SendMailAsync(product.ProductPageUrl, skusToNotify);
-                    var whatsAppBody = await _notificationService.SendWhatsAppAsync(product.ProductPageUrl, skusToNotify);
+                    var emailBody = await _notificationService.SendMailAsync(product.Id, skusToNotify);
+                    var whatsAppBody = await _notificationService.SendWhatsAppAsync(product.Id, skusToNotify);
 
                     // Record in database
                     notificationHistory = new NotificationHistory

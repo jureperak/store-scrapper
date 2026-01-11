@@ -7,6 +7,8 @@ public class ProductSku
     public int Sku { get; set; } 
     
     public int ProductId { get; set; }
+
+    public bool TemporaryDisabled { get; set; }
     
     public string Name { get; set; } = string.Empty;
 
@@ -17,6 +19,8 @@ public class ProductSku
     // Navigation properties
     
     public Product Product { get; set; } = null!;
+
+    public List<ProductSkuReActivation> ProductSkuReActivations { get; set; } = [];
     
     public List<NotificationHistory> NotificationHistories { get; set; } = new();
 }

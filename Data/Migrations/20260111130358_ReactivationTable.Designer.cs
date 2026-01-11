@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StoreScrapper.Data;
@@ -11,9 +12,11 @@ using StoreScrapper.Data;
 namespace StoreScrapper.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260111130358_ReactivationTable")]
+    partial class ReactivationTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -257,6 +260,10 @@ namespace StoreScrapper.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("product_id");
 
+                    b.Property<int?>("ProductSkuReActivationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_sku_re_activation_id");
+
                     b.Property<int>("Sku")
                         .HasColumnType("integer")
                         .HasColumnName("sku");
@@ -278,6 +285,10 @@ namespace StoreScrapper.Data.Migrations
                     b.HasIndex("ProductId")
                         .HasDatabaseName("ix_product_skus_product_id");
 
+                    b.HasIndex("ProductSkuReActivationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_product_skus_product_sku_re_activation_id");
+
                     b.ToTable("product_skus", (string)null);
                 });
 
@@ -294,18 +305,14 @@ namespace StoreScrapper.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<bool>("IsUsed")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_used");
-
-                    b.Property<int>("ProductSkuId")
-                        .HasColumnType("integer")
-                        .HasColumnName("product_sku_id");
-
                     b.Property<string>("ReEnableUrl")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("re_enable_url");
+
+                    b.Property<bool>("ReEnableUsed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("re_enable_used");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -317,9 +324,6 @@ namespace StoreScrapper.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_product_sku_re_activations");
-
-                    b.HasIndex("ProductSkuId")
-                        .HasDatabaseName("ix_product_sku_re_activations_product_sku_id");
 
                     b.ToTable("product_sku_re_activations", (string)null);
                 });
@@ -398,19 +402,14 @@ namespace StoreScrapper.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_product_skus_products_product_id");
 
+                    b.HasOne("StoreScrapper.Models.Entities.ProductSkuReActivation", "ProductSkuReActivation")
+                        .WithOne("ProductSku")
+                        .HasForeignKey("StoreScrapper.Models.Entities.ProductSku", "ProductSkuReActivationId")
+                        .HasConstraintName("fk_product_skus_product_sku_re_activations_product_sku_re_acti");
+
                     b.Navigation("Product");
-                });
 
-            modelBuilder.Entity("StoreScrapper.Models.Entities.ProductSkuReActivation", b =>
-                {
-                    b.HasOne("StoreScrapper.Models.Entities.ProductSku", "ProductSku")
-                        .WithMany("ProductSkuReActivations")
-                        .HasForeignKey("ProductSkuId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_product_sku_re_activations_product_skus_product_sku_id");
-
-                    b.Navigation("ProductSku");
+                    b.Navigation("ProductSkuReActivation");
                 });
 
             modelBuilder.Entity("StoreScrapper.Models.Entities.JobExecutionLog", b =>
@@ -423,9 +422,10 @@ namespace StoreScrapper.Data.Migrations
                     b.Navigation("ProductSkus");
                 });
 
-            modelBuilder.Entity("StoreScrapper.Models.Entities.ProductSku", b =>
+            modelBuilder.Entity("StoreScrapper.Models.Entities.ProductSkuReActivation", b =>
                 {
-                    b.Navigation("ProductSkuReActivations");
+                    b.Navigation("ProductSku")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

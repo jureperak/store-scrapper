@@ -37,6 +37,7 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer();
 
 // Configure options
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.SectionName));
 builder.Services.Configure<MailgunOptions>(builder.Configuration.GetSection(MailgunOptions.SectionName));
 builder.Services.Configure<TwilioOptions>(builder.Configuration.GetSection(TwilioOptions.SectionName));
 

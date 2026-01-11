@@ -15,6 +15,8 @@ public class AppDbContext : DbContext
 
     public DbSet<ProductSku> ProductSkus { get; set; }
 
+    public DbSet<ProductSkuReActivation> ProductSkuReActivations { get; set; }
+
     public DbSet<NotificationHistory> NotificationHistory { get; set; }
 
     public DbSet<JobExecutionLog> JobExecutionLogs { get; set; }

@@ -1,5 +1,12 @@
 namespace StoreScrapper.Models;
 
+public class AppOptions
+{
+    public const string SectionName = "App";
+
+    public string BaseUrl { get; set; } = string.Empty;
+}
+
 public class MailgunOptions
 {
     public const string SectionName = "Mailgun";
