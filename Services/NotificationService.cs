@@ -33,23 +33,21 @@ public class NotificationService : INotificationService
         };
         RestClient client = new RestClient(options);
 
+        var request = new RestRequest($"/v3/{_mailgunOptions.Domain}/messages", Method.Post);
+        request.AddParameter("from", $"Excited User <postmaster@{_mailgunOptions.Domain}>");
+
         var recipients = _mailgunOptions.Recipients.Split(';');
-
-        RestRequest request = new RestRequest("{domain}/messages", Method.Post);
-        request.AddParameter("domain", _mailgunOptions.Domain, ParameterType.UrlSegment);
-        request.AddParameter("from", $"Excited User <mailgun@{_mailgunOptions.Domain}>");
-
         foreach (var recipient in recipients)
         {
             request.AddParameter("to", recipient);
         }
 
         var skuOrSkus = skusAvailable.Count > 1 ? "skus" : "sku";
-        var skuAvailable = string.Join("\n", skusAvailable.Select(x => $"{x.Name}: {skuOrSkus}"));
+        var skuAvailable = string.Join("\n", skusAvailable.Select(x => $"{x.Name}: {x.Sku}"));
 
-        var body = $"Dostupno:\n{link}\n\n{skuOrSkus}\n:{skuAvailable}";
+        var body = $"Dostupno:\n{link}\n\n{skuOrSkus}:\n{skuAvailable}";
         request.AddParameter("text", body);
-        request.AddParameter("subject", "Hurry!!!");
+        request.AddParameter("subject", $"Hurry!!! {skusAvailable.First().Name}");
         await client.ExecuteAsync(request);
 
         return body;
