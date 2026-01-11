@@ -1,0 +1,49 @@
+@model ProductFormViewModel
+
+@{
+    ViewData["Title"] = "Create Product For Scraping";
+}
+
+<h1>Scrape New Product</h1>
+
+<form asp-action="Create" method="post" class="mt-4">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <label asp-for="Adapter" class="form-label"></label>
+        <select asp-for="Adapter" class="form-select">
+            <option value="Zara">Zara</option>
+            <option value="PullAndBear">Pull & Bear</option>
+        </select>
+        <span asp-validation-for="Adapter" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="AvailabilityUrl" class="form-label"></label>
+        <input asp-for="AvailabilityUrl" class="form-control" placeholder="https://www.zara.com/itxrest/..." />
+        <span asp-validation-for="AvailabilityUrl" class="text-danger"></span>
+        <div class="form-text">The API endpoint that returns product availability</div>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="ProductPageUrl" class="form-label"></label>
+        <input asp-for="ProductPageUrl" class="form-control" placeholder="https://www.zara.com/hr/hr/product..." />
+        <span asp-validation-for="ProductPageUrl" class="text-danger"></span>
+        <div class="form-text">The product page URL that will be sent in notifications</div>
+    </div>
+
+    <div class="mb-3 form-check">
+        <input asp-for="IsEnabled" class="form-check-input" type="checkbox" checked />
+        <label asp-for="IsEnabled" class="form-check-label"></label>
+        <div class="form-text">Start monitoring immediately after creation</div>
+    </div>
+
+    <div class="mt-4">
+        <button type="submit" class="btn btn-primary">Add Product for Scraping</button>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

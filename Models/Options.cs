@@ -15,7 +15,7 @@ public class TwilioOptions
     public const string SectionName = "Twilio";
 
     public string AccountSid { get; set; } = string.Empty;
-    public string AuthToken { get; set; } = string.Empty;
+    public string AccountToken { get; set; } = string.Empty;
     public string SendFromNumber { get; set; } = string.Empty;
     public string SendToNumber { get; set; } = string.Empty;
 }

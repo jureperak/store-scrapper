@@ -1,31 +1,45 @@
+using System.Text.Json.Serialization;
+
 namespace StoreScrapper.Models;
 
 public class ZaraModel
 {
-    public List<SkusAvailabilityZaraModel> skusAvailability { get; set; }
+    [JsonPropertyName("skusAvailability")]
+    public List<SkusAvailabilityZaraModel> SkusAvailability { get; set; } = [];
 }
 
 public class SkusAvailabilityZaraModel
 {
-    public int sku { get; set; }
+    [JsonPropertyName("sku")]
+    public int Sku { get; set; }
 
-    public string availability { get; set; }
+    [JsonPropertyName("availability")]
+    public string Availability { get; set; } = string.Empty;
 }
 
 public class PullAndBearModel
 {
-    public List<ParentStockPullAndBearModel> stocks { get; set; }
+    [JsonPropertyName("stocks")]
+    public List<ParentStockPullAndBearModel> Stocks { get; set; } = [];
 }
 
 public class ParentStockPullAndBearModel
 {
-    public int productId { get; set; }
-    public List<StockPullAndBearModel> stocks { get; set; }
+    [JsonPropertyName("productId")]
+    public int ProductId { get; set; }
+
+    [JsonPropertyName("stocks")]
+    public List<StockPullAndBearModel> Stocks { get; set; } = [];
 }
 
 public class StockPullAndBearModel
 {
-    public int id { get; set; }
-    public string availability { get; set; }
-    public string typeThreshold { get; set; }
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("availability")]
+    public string Availability { get; set; } = string.Empty;
+
+    [JsonPropertyName("typeThreshold")]
+    public string TypeThreshold { get; set; } = string.Empty;
 }

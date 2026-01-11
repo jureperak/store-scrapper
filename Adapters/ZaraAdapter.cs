@@ -1,23 +1,20 @@
 using System.Text.Json;
 using StoreScrapper.Models;
-using StoreScrapper.Services;
 
 namespace StoreScrapper.Adapters;
 
-public class ZaraAdapter : IStoreAdapter
+public interface IZaraAdapter : IStoreAdapter;
+
+public class ZaraAdapter : IZaraAdapter
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly List<int> _alreadySentNotifications;
-    private readonly NotificationService _notificationService;
 
-    public ZaraAdapter(IHttpClientFactory httpClientFactory, List<int> alreadySentNotifications, NotificationService notificationService)
+    public ZaraAdapter(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
-        _alreadySentNotifications = alreadySentNotifications;
-        _notificationService = notificationService;
     }
 
-    public async Task<bool> FetchAndProcessAsync(string availabilityUrl, string productPageUrl, int? neededProduct, List<int> productsToAvoid)
+    public async Task<AdapterResult> FetchAndProcessAsync(string availabilityUrl, List<int> neededProductSkus)
     {
         var httpClient = _httpClientFactory.CreateClient();
         
@@ -26,45 +23,37 @@ public class ZaraAdapter : IStoreAdapter
 
         if (!httpResponseMessage.IsSuccessStatusCode)
         {
-            return false;
+            return AdapterResult.ErrorResult($"HTTP request failed with status code: {httpResponseMessage.StatusCode}");
         }
 
         var webPageString = await httpResponseMessage.Content.ReadAsStringAsync();
-        var model = JsonSerializer.Deserialize<ZaraModel>(webPageString)!;
 
-        var availableProducts = model.skusAvailability
-            .Where(x => x.availability == "in_stock" )
-            .Where(x => !_alreadySentNotifications.Contains(x.sku))
-            .ToList();
+        ZaraModel? model;
         
-        if (neededProduct.HasValue)
+        try
         {
-            availableProducts = availableProducts
-                .Where(x => x.sku == neededProduct)
-                .ToList();
+            model = JsonSerializer.Deserialize<ZaraModel>(webPageString);
+            if (model == null)
+            {
+                return AdapterResult.ErrorResult("Failed to deserialize JSON response");
+            }
+        }
+        catch (JsonException ex)
+        {
+            return AdapterResult.ErrorResult($"JSON deserialization error: {ex.Message}");
         }
 
-        if (productsToAvoid.Any())
-        {
-            availableProducts = availableProducts
-                .Where(x => !productsToAvoid.Contains(x.sku))
-                .ToList();
-        }
+        // Filter available products
+        var availableProducts = model.SkusAvailability
+            .Where(x => x.Availability == "in_stock")
+            .Where(x => neededProductSkus.Contains(x.Sku))
+            .ToList();
 
-        if (availableProducts.Any())
-        {
-            var availableSkus = availableProducts
-                .Select(x => x.sku)
-                .ToList();
+        // Return the list of available SKUs
+        var availableSkus = availableProducts
+            .Select(x => x.Sku)
+            .ToList();
 
-            var task1 = _notificationService.SendMailAsync(productPageUrl, string.Join(", ", availableSkus));
-            var task2 = _notificationService.SendWhatsAppAsync(productPageUrl, string.Join(", ", availableSkus));
-
-            await Task.WhenAll(task1, task2);
-
-            _alreadySentNotifications.AddRange(availableSkus);
-        }
-
-        return true;
+        return AdapterResult.SuccessResult(availableSkus);
     }
 }

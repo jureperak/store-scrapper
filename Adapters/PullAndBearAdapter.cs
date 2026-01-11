@@ -1,23 +1,20 @@
 using System.Text.Json;
 using StoreScrapper.Models;
-using StoreScrapper.Services;
 
 namespace StoreScrapper.Adapters;
 
-public class PullAndBearAdapter : IStoreAdapter
+public interface IPullAndBearAdapter : IStoreAdapter;
+
+public class PullAndBearAdapter : IPullAndBearAdapter
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly List<int> _alreadySentNotifications;
-    private readonly NotificationService _notificationService;
 
-    public PullAndBearAdapter(IHttpClientFactory httpClientFactory, List<int> alreadySentNotifications, NotificationService notificationService)
+    public PullAndBearAdapter(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
-        _alreadySentNotifications = alreadySentNotifications;
-        _notificationService = notificationService;
     }
 
-    public async Task<bool> FetchAndProcessAsync(string availabilityUrl, string productPageUrl, int? neededProduct, List<int> productsToAvoid)
+    public async Task<AdapterResult> FetchAndProcessAsync(string availabilityUrl, List<int> neededProductSkus)
     {
         var httpClient = _httpClientFactory.CreateClient();
         
@@ -26,46 +23,37 @@ public class PullAndBearAdapter : IStoreAdapter
 
         if (!httpResponseMessage.IsSuccessStatusCode)
         {
-            return false;
+            return AdapterResult.ErrorResult($"HTTP request failed with status code: {httpResponseMessage.StatusCode}");
         }
 
         var webPageString = await httpResponseMessage.Content.ReadAsStringAsync();
-        var model = JsonSerializer.Deserialize<PullAndBearModel>(webPageString)!;
 
-        var availableProducts = model.stocks
-            .SelectMany(x => x.stocks)
-            .Where(x => x.availability == "in_stock" )
-            .Where(x => !_alreadySentNotifications.Contains(x.id))
+        PullAndBearModel? model;
+        try
+        {
+            model = JsonSerializer.Deserialize<PullAndBearModel>(webPageString);
+            if (model == null)
+            {
+                return AdapterResult.ErrorResult("Failed to deserialize JSON response");
+            }
+        }
+        catch (JsonException ex)
+        {
+            return AdapterResult.ErrorResult($"JSON deserialization error: {ex.Message}");
+        }
+
+        // Filter available products
+        var availableProducts = model.Stocks
+            .SelectMany(x => x.Stocks)
+            .Where(x => x.Availability == "in_stock")
+            .Where(x => neededProductSkus.Contains(x.Id))
             .ToList();
-        
-        if (neededProduct.HasValue)
-        {
-            availableProducts = availableProducts
-                .Where(x => x.id == neededProduct)
-                .ToList();
-        }
 
-        if (productsToAvoid.Any())
-        {
-            availableProducts = availableProducts
-                .Where(x => !productsToAvoid.Contains(x.id))
-                .ToList();
-        }
+        // Return the list of available SKUs
+        var availableSkus = availableProducts
+            .Select(x => x.Id)
+            .ToList();
 
-        if (availableProducts.Any())
-        {
-            var availableSkus = availableProducts
-                .Select(x => x.id)
-                .ToList();
-
-            var task1 = _notificationService.SendMailAsync(productPageUrl, string.Join(", ", availableSkus));
-            var task2 = _notificationService.SendWhatsAppAsync(productPageUrl, string.Join(", ", availableSkus));
-
-            await Task.WhenAll(task1, task2);
-
-            _alreadySentNotifications.AddRange(availableSkus);
-        }
-
-        return true;
+        return AdapterResult.SuccessResult(availableSkus);
     }
 }

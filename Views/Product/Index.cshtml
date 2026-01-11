@@ -1,0 +1,90 @@
+@model List<Product>
+
+@{
+    ViewData["Title"] = "Products for Scrapers";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Product for Scraping</h1>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add New Product
+    </a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        <h4>No products configured yet</h4>
+        <p>Get started by adding your first product to monitor.</p>
+        <a asp-action="Create" class="btn btn-primary">Add Product</a>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Adapter</th>
+                    <th>Product URL</th>
+                    <th>Status</th>
+                    <th>Check Interval</th>
+                    <th>Last Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in Model)
+                {
+                    <tr>
+                        <td>@product.Id</td>
+                        <td>
+                            <span class="badge bg-info">@product.Adapter.Name</span>
+                        </td>
+                        <td>
+                            <a href="@product.ProductPageUrl" target="_blank" class="text-truncate d-inline-block" style="max-width: 300px;">
+                                @product.ProductPageUrl
+                            </a>
+                        </td>
+                        <td>
+                            <form asp-action="ToggleEnabled" asp-route-id="@product.Id" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm @(product.IsEnabled ? "btn-success" : "btn-secondary")">
+                                    @(product.IsEnabled ? "✓ Enabled" : "✗ Disabled")
+                                </button>
+                            </form>
+                        </td>
+                        <td>Every @product.CheckIntervalSeconds sec</td>
+                        <td>
+                            @if (product.UpdatedAt.HasValue)
+                            {
+                                @product.UpdatedAt.Value.ToLocalTime().ToString("g")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Never</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a asp-action="Edit" asp-route-id="@product.Id" class="btn btn-sm btn-warning">Edit</a>
+                                <form asp-action="Delete" asp-route-id="@product.Id" method="post" class="d-inline"
+                                      onsubmit="return confirm('Are you sure you want to delete this product? This will also delete all notification history.');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4">
+        <a href="/hangfire" target="_blank" class="btn btn-secondary">
+            View Hangfire Dashboard →
+        </a>
+    </div>
+}
