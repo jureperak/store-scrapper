@@ -26,6 +26,8 @@ public class ProductController : Controller
     {
         var products = await _dbContext.Products
             .Include(x => x.Adapter)
+            .Include(x => x.ProductSkus)
+            .ThenInclude(x => x.ProductSkuReActivations)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
 

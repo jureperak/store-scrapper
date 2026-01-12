@@ -27,7 +27,8 @@ else
                 <tr>
                     <th>ID</th>
                     <th>Adapter</th>
-                    <th>Product URL</th>
+                    <th>Product Name</th>
+                    <th>Sizes</th>
                     <th>Status</th>
                     <th>Check Interval</th>
                     <th>Last Updated</th>
@@ -43,9 +44,22 @@ else
                             <span class="badge bg-info">@product.Adapter.Name</span>
                         </td>
                         <td>
-                            <a href="@product.ProductPageUrl" target="_blank" class="text-truncate d-inline-block" style="max-width: 300px;">
-                                @product.ProductPageUrl
+                            <a href="@product.ProductPageUrl" target="_blank" class="text-truncate d-inline-block" style="max-width: 300px;" title="@product.ProductPageUrl">
+                                @product.Name
                             </a>
+                        </td>
+                        <td>
+                            @foreach (var sku in product.ProductSkus)
+                            {
+                                if (sku.TemporaryDisabled)
+                                {
+                                    <span class="badge bg-secondary text-decoration-line-through me-1" title="Temporarily disabled">@sku.Name</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-primary me-1">@sku.Name</span>
+                                }
+                            }
                         </td>
                         <td>
                             <form asp-action="ToggleEnabled" asp-route-id="@product.Id" method="post" class="d-inline">
