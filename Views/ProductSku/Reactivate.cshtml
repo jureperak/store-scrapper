@@ -1,0 +1,142 @@
+@model ReactivationResultViewModel
+
+@{
+    ViewData["Title"] = Model.Success ? "SKU Reactivated" : "Reactivation Failed";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            @if (Model.Success)
+            {
+                <!-- Success Card -->
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>Success!
+                        </h4>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="mb-4">
+                            <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+                        </div>
+
+                        <h5 class="mb-3">@Model.Message</h5>
+
+                        <div class="alert alert-light border">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4 text-end">Product:</dt>
+                                <dd class="col-sm-8 text-start">@Model.ProductName</dd>
+
+                                <dt class="col-sm-4 text-end">Size:</dt>
+                                <dd class="col-sm-8 text-start">
+                                    <span class="badge bg-primary">@Model.ProductSkuName</span>
+                                </dd>
+
+                                <dt class="col-sm-4 text-end">SKU:</dt>
+                                <dd class="col-sm-8 text-start">
+                                    <code>@Model.Sku</code>
+                                </dd>
+                            </dl>
+                        </div>
+
+                        <p class="text-muted mt-3">
+                            We'll notify you when this size becomes available again!
+                        </p>
+
+                        @if (Model.ProductId.HasValue)
+                        {
+                            <div class="mt-4">
+                                <a asp-controller="Product" asp-action="Details" asp-route-id="@Model.ProductId" class="btn btn-primary">
+                                    <i class="bi bi-eye"></i> View Product Details
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Error Card -->
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h4 class="mb-0">
+                            <i class="bi bi-x-circle-fill me-2"></i>Reactivation Failed
+                        </h4>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="mb-4">
+                            @if (Model.ErrorType == "Expired")
+                            {
+                                <i class="bi bi-clock-history text-warning" style="font-size: 4rem;"></i>
+                            }
+                            else if (Model.ErrorType == "AlreadyUsed")
+                            {
+                                <i class="bi bi-check-circle text-info" style="font-size: 4rem;"></i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-x-circle text-danger" style="font-size: 4rem;"></i>
+                            }
+                        </div>
+
+                        <h5 class="mb-3">@Model.Message</h5>
+
+                        @if (!string.IsNullOrWhiteSpace(Model.ProductSkuName))
+                        {
+                            <div class="alert alert-light border">
+                                <dl class="row mb-0">
+                                    <dt class="col-sm-4 text-end">Size:</dt>
+                                    <dd class="col-sm-8 text-start">
+                                        <span class="badge bg-secondary">@Model.ProductSkuName</span>
+                                    </dd>
+
+                                    @if (Model.Sku.HasValue)
+                                    {
+                                        <dt class="col-sm-4 text-end">SKU:</dt>
+                                        <dd class="col-sm-8 text-start">
+                                            <code>@Model.Sku</code>
+                                        </dd>
+                                    }
+
+                                    @if (Model.ExpiredAt.HasValue)
+                                    {
+                                        <dt class="col-sm-4 text-end">Expired:</dt>
+                                        <dd class="col-sm-8 text-start">
+                                            @Model.ExpiredAt.Value.ToLocalTime().ToString("f")
+                                        </dd>
+                                    }
+                                </dl>
+                            </div>
+                        }
+
+                        @if (Model.ErrorType == "Expired")
+                        {
+                            <p class="text-muted mt-3">
+                                This reactivation link has expired. If you still want to monitor this product, please contact support or add it again from the product page.
+                            </p>
+                        }
+                        else if (Model.ErrorType == "AlreadyUsed")
+                        {
+                            <p class="text-muted mt-3">
+                                This SKU has already been reactivated. You should receive notifications when it becomes available.
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="text-muted mt-3">
+                                The reactivation link you used is invalid or has been removed.
+                            </p>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="text-center mt-4">
+                <a asp-controller="Product" asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Products
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

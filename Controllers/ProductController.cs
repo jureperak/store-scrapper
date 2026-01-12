@@ -204,19 +204,31 @@ public class ProductController : Controller
                 var selectedSkus = System.Text.Json.JsonSerializer.Deserialize<List<SkuData>>(model.SelectedSkusJson);
                 if (selectedSkus != null)
                 {
-                    // Remove all existing ProductSkus
-                    _dbContext.ProductSkus.RemoveRange(product.ProductSkus);
+                    var selectedSkuSet = selectedSkus.Select(s => s.Sku).ToHashSet();
+                    var existingSkuSet = product.ProductSkus.Select(s => s.Sku).ToHashSet();
 
-                    // Add new ones
+                    // Archive ProductSkus not present in selection
+                    foreach (var sku in product.ProductSkus)
+                    {
+                        if (!selectedSkuSet.Contains(sku.Sku) && sku.ArchivedAt == null)
+                        {
+                            sku.ArchivedAt = DateTime.UtcNow;
+                        }
+                    }
+
+                    // Add new ProductSkus that are not already present (not archived)
                     foreach (var skuData in selectedSkus)
                     {
-                        product.ProductSkus.Add(new ProductSku
+                        if (!existingSkuSet.Contains(skuData.Sku))
                         {
-                            Name = skuData.Name,
-                            Sku = skuData.Sku,
-                            CreatedAt = DateTime.UtcNow,
-                            TemporaryDisabled = false
-                        });
+                            product.ProductSkus.Add(new ProductSku
+                            {
+                                Name = skuData.Name,
+                                Sku = skuData.Sku,
+                                CreatedAt = DateTime.UtcNow,
+                                TemporaryDisabled = false
+                            });
+                        }
                     }
                 }
             }
@@ -269,7 +281,7 @@ public class ProductController : Controller
         var product = await _dbContext.Products
             .Where(x => x.Id == id)
             .FirstOrDefaultAsync();
-        
+
         if (product == null)
         {
             return NotFound();
@@ -285,6 +297,50 @@ public class ProductController : Controller
 
         TempData["Success"] = $"Product {(product.IsEnabled ? "enabled" : "disabled")} successfully!";
         return RedirectToAction(nameof(Index));
+    }
+
+    // GET: /Product/Details/5
+    public async Task<IActionResult> Details(int id)
+    {
+        var product = await _dbContext.Products
+            .AsNoTracking()
+            .Include(x => x.Adapter)
+            .Include(x => x.ProductSkus)
+            .Where(x => x.Id == id)
+            .FirstOrDefaultAsync();
+
+        if (product == null)
+        {
+            return NotFound();
+        }
+
+        // Get job execution logs
+        var jobExecutionLogs = await _dbContext.JobExecutionLogs
+            .AsNoTracking()
+            .Include(x => x.ProductSkus)
+            .Where(x => x.ProductId == id)
+            .OrderByDescending(x => x.ExecutedAt)
+            .Take(50)
+            .ToListAsync();
+
+        // Get notification history
+        var notificationHistory = await _dbContext.NotificationHistory
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(x => x.ProductSkus)
+            .Where(x => x.ProductId == id)
+            .OrderByDescending(x => x.SentAt)
+            .Take(50)
+            .ToListAsync();
+
+        var viewModel = new ProductDetailsViewModel
+        {
+            Product = product,
+            JobExecutionLogs = jobExecutionLogs,
+            NotificationHistory = notificationHistory
+        };
+
+        return View(viewModel);
     }
 
     // POST: /Product/ScrapeProductPage

@@ -99,7 +99,7 @@ public class StoreScrapingService : IStoreScrapingService
                     productSku.ProductSkuReActivations.Add(new ProductSkuReActivation()
                     {
                         CreatedAt = DateTime.UtcNow,
-                        ReEnableUrl = $"{_appOptions.BaseUrl}/api/productsku/{Guid.NewGuid()}/reactivate",
+                        ReEnableUrl = $"{_appOptions.BaseUrl}/productsku/{Guid.NewGuid()}/reactivate",
                         ValidTo = DateTime.UtcNow.AddMinutes(30),
                         IsUsed = false,
                     });

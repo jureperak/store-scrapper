@@ -1,12 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StoreScrapper.Data;
+using StoreScrapper.Models.ViewModels;
 
 namespace StoreScrapper.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class ProductSkuController : ControllerBase
+public class ProductSkuController : Controller
 {
     private readonly AppDbContext _dbContext;
 
@@ -20,42 +19,50 @@ public class ProductSkuController : ControllerBase
     /// </summary>
     /// <param name="token">The reactivation token (GUID)</param>
     /// <returns>Result of the reactivation attempt</returns>
-    [HttpGet("{token}/reactivate")]
+    [HttpGet("ProductSku/{token}/reactivate")]
     public async Task<IActionResult> Reactivate(Guid token)
     {
         // Find the reactivation record by URL (contains the GUID token)
         var reactivation = await _dbContext.ProductSkuReActivations
             .Include(x => x.ProductSku)
+            .ThenInclude(x => x.Product)
             .Where(x => x.ReEnableUrl.Contains(token.ToString()))
             .FirstOrDefaultAsync();
 
         if (reactivation == null)
         {
-            return NotFound(new
+            return View(new ReactivationResultViewModel
             {
-                success = false,
-                message = "Reactivation token not found."
+                Success = false,
+                Message = "Reactivation token not found.",
+                ErrorType = "NotFound"
             });
         }
 
         // Check if already used
         if (reactivation.IsUsed)
         {
-            return BadRequest(new
+            return View(new ReactivationResultViewModel
             {
-                success = false,
-                message = "This reactivation link has already been used."
+                Success = false,
+                Message = "This reactivation link has already been used.",
+                ErrorType = "AlreadyUsed",
+                ProductSkuName = reactivation.ProductSku.Name,
+                Sku = reactivation.ProductSku.Sku
             });
         }
 
         // Check if expired
         if (reactivation.ValidTo < DateTime.UtcNow)
         {
-            return BadRequest(new
+            return View(new ReactivationResultViewModel
             {
-                success = false,
-                message = $"This reactivation link expired on {reactivation.ValidTo:u}.",
-                expiredAt = reactivation.ValidTo
+                Success = false,
+                Message = $"This reactivation link expired on {reactivation.ValidTo.ToLocalTime():g}.",
+                ErrorType = "Expired",
+                ExpiredAt = reactivation.ValidTo,
+                ProductSkuName = reactivation.ProductSku.Name,
+                Sku = reactivation.ProductSku.Sku
             });
         }
 
@@ -69,13 +76,14 @@ public class ProductSkuController : ControllerBase
 
         await _dbContext.SaveChangesAsync();
 
-        return Ok(new
+        return View(new ReactivationResultViewModel
         {
-            success = true,
-            message = $"ProductSku '{reactivation.ProductSku.Name}' (SKU: {reactivation.ProductSku.Sku}) has been successfully reactivated.",
-            productSkuId = reactivation.ProductSku.Id,
-            productSkuName = reactivation.ProductSku.Name,
-            sku = reactivation.ProductSku.Sku
+            Success = true,
+            Message = $"Your product SKU has been reactivated successfully!",
+            ProductSkuName = reactivation.ProductSku.Name,
+            Sku = reactivation.ProductSku.Sku,
+            ProductId = reactivation.ProductSku.ProductId,
+            ProductName = reactivation.ProductSku.Product.Name
         });
     }
 }
