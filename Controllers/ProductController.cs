@@ -34,13 +34,13 @@ public class ProductController : Controller
         return View(products);
     }
 
-    // GET: /Stores/Create
+    // GET: /Product/Create
     public IActionResult Create()
     {
         return View(new ProductFormViewModel());
     }
 
-    // POST: /Stores/Create
+    // POST: /Product/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(ProductFormViewModel model)
@@ -119,7 +119,7 @@ public class ProductController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // GET: /Stores/Edit/5
+    // GET: /Product/Edit/5
     public async Task<IActionResult> Edit(int id)
     {
         var product = await _dbContext.Products
@@ -153,7 +153,7 @@ public class ProductController : Controller
         return View(viewModel);
     }
 
-    // POST: /Stores/Edit/5
+    // POST: /Product/Edit/5
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, ProductFormViewModel model)
@@ -247,7 +247,7 @@ public class ProductController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // POST: /Stores/Delete/5
+    // POST: /Product/Delete/5
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
@@ -273,7 +273,7 @@ public class ProductController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // POST: /Stores/ToggleEnabled/5
+    // POST: /Product/ToggleEnabled/5
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleEnabled(int id)
