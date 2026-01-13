@@ -29,7 +29,12 @@ builder.Services.AddHangfire(config =>
           .UseSimpleAssemblyNameTypeSerializer()
           .UseRecommendedSerializerSettings()
           .UsePostgreSqlStorage(x => 
-              x.UseNpgsqlConnection(builder.Configuration.GetConnectionString("HangfireConnection"))
+              x.UseNpgsqlConnection(builder.Configuration.GetConnectionString("HangfireConnection")),
+              new PostgreSqlStorageOptions
+              {
+                  PrepareSchemaIfNecessary = true,
+                  QueuePollInterval = TimeSpan.FromMilliseconds(500),
+              }
             );
 });
 
