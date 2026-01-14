@@ -69,6 +69,23 @@ From gaming consoles to fashion alerts - that's called pivoting! 😄
 
 **Manage**: Toggle enabled/disabled, archive products, view Hangfire dashboard for logs
 
+## Screenshots
+
+**Products List**
+![Products list with status indicators and SKU badges](img.png)
+
+**Add New Product**
+![Enter product URL and select store adapter](img_1.png)
+
+**Select Sizes After Scraping**
+![Choose which SKUs to monitor](img_2.png)
+
+**Product Details**
+![Job execution logs and notification history](img_3.png)
+
+**Notification Details**
+![View email and WhatsApp message content](img_4.png)
+
 ## How It Works
 
 **Database**: PostgreSQL with snake_case (products, product_skus, notification_history, job_execution_logs)
