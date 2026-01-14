@@ -39,7 +39,10 @@ builder.Services.AddHangfire(config =>
 });
 
 // Add Hangfire server
-builder.Services.AddHangfireServer();
+builder.Services.AddHangfireServer((options =>
+{
+    options.SchedulePollingInterval = TimeSpan.FromMilliseconds(500);
+}));
 
 // Configure options
 builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.SectionName));

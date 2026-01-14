@@ -261,9 +261,6 @@ public class ProductController : Controller
             return NotFound();
         }
 
-        // Remove Hangfire job
-        _jobManager.RemoveStoreJob(product);
-        
         product.IsEnabled = false;
         product.ArchivedAt = DateTime.UtcNow;
 

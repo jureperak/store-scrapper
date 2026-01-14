@@ -5,71 +5,41 @@ namespace StoreScrapper.Jobs;
 
 public class HangfireJobManager
 {
+    /// <summary>
+    /// Schedules the initial job for a product. Job will reschedule itself after each execution.
+    /// </summary>
     public void ScheduleStoreJob(Product product)
     {
         if (!product.IsEnabled)
         {
-            RemoveStoreJob(product);
+            // Product is disabled, don't schedule anything
+            product.HangfireJobId = null;
             return;
         }
 
         var jobId = $"product-{product.Id}";
 
-        // Schedule recurring job based on seconds
-        // Convert seconds to appropriate cron expression
-        string cronExpression;
-
-        if (product.CheckIntervalSeconds < 60)
-        {
-            // For intervals less than 1 minute, use seconds (Hangfire supports this via custom storage)
-            // We'll use the minimum granularity of 1 minute but note this in logs
-            cronExpression = "* * * * *"; // Every minute (minimum for standard cron)
-        }
-        else if (product.CheckIntervalSeconds % 60 == 0)
-        {
-            // Evenly divisible by 60, use minute-based cron
-            var minutes = product.CheckIntervalSeconds / 60;
-
-            if (minutes < 60)
-            {
-                cronExpression = $"*/{minutes} * * * *";
-            }
-            else if (minutes == 60)
-            {
-                cronExpression = Cron.Hourly();
-            }
-            else
-            {
-                // For intervals > 60 minutes, run every hour
-                cronExpression = Cron.Hourly();
-            }
-        }
-        else
-        {
-            // Not evenly divisible by 60, round up to nearest minute
-            var minutes = (product.CheckIntervalSeconds + 59) / 60;
-            cronExpression = $"*/{minutes} * * * *";
-        }
-
-        RecurringJob.AddOrUpdate<StoreScrapingJob>(
-            jobId,
+        // Schedule the first execution immediately (or after a short delay)
+        var scheduledJobId = BackgroundJob.Schedule<StoreScrapingJob>(
             job => job.ExecuteAsync(product.Id),
-            cronExpression,
-            new RecurringJobOptions
-            {
-                TimeZone = TimeZoneInfo.Local
-            }
+            TimeSpan.FromSeconds(1) // Start after 1 second
         );
 
         product.HangfireJobId = jobId;
+        Console.WriteLine($"[Product {product.Id}] Initial job scheduled with ID: {scheduledJobId}");
     }
 
-    public void RemoveStoreJob(Product product)
+    /// <summary>
+    /// Schedules the next execution for a product after the specified delay
+    /// </summary>
+    public static string ScheduleNextExecution(int productId, int delaySeconds)
     {
-        if (!string.IsNullOrEmpty(product.HangfireJobId))
-        {
-            RecurringJob.RemoveIfExists(product.HangfireJobId);
-            product.HangfireJobId = null;
-        }
+        var scheduledJobId = BackgroundJob.Schedule<StoreScrapingJob>(
+            job => job.ExecuteAsync(productId),
+            TimeSpan.FromSeconds(delaySeconds)
+        );
+
+        Console.WriteLine($"[Product {productId}] Next job scheduled in {delaySeconds}s with ID: {scheduledJobId}");
+        return scheduledJobId;
     }
 }

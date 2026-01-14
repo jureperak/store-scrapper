@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -32,6 +33,8 @@ public class StoreScrapingService : IStoreScrapingService
 
     public async Task<ScrapingResult> ScrapeStoreAsync(int productId)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             // 1. Load product from database
@@ -45,25 +48,32 @@ public class StoreScrapingService : IStoreScrapingService
             
             if (product == null)
             {
+                stopwatch.Stop();
+                await LogExecutionAsync(productId, false, "Product not found", null, [], stopwatch.Elapsed);
                 return ScrapingResult.CreateError("Product not found");
             }
 
             if (!product.IsEnabled)
             {
+                stopwatch.Stop();
+                await LogExecutionAsync(productId, false, "Product is disabled", null, [], stopwatch.Elapsed);
                 return ScrapingResult.CreateSkipped("Product is disabled");
             }
 
             // 2. Get appropriate adapter
             var adapter = GetAdapter(product.Adapter.Name);
-            
+
             if (adapter == null)
             {
-                await LogExecutionAsync(productId, false, $"Unknown adapter: {product.Adapter}", null, []);
+                stopwatch.Stop();
+                await LogExecutionAsync(productId, false, $"Unknown adapter: {product.Adapter}", null, [], stopwatch.Elapsed);
                 return ScrapingResult.CreateError($"Unknown adapter: {product.Adapter.Name}");
             }
-            
+
             if(!product.ProductSkus.Any())
             {
+                stopwatch.Stop();
+                await LogExecutionAsync(productId, false, "There are no active SKUs to check", null, [], stopwatch.Elapsed);
                 return ScrapingResult.CreateSkipped("There are no active SKUs to check");
             }
 
@@ -72,7 +82,8 @@ public class StoreScrapingService : IStoreScrapingService
 
             if (!result.Success)
             {
-                await LogExecutionAsync(productId, false, result.ErrorMessage, null, []);
+                stopwatch.Stop();
+                await LogExecutionAsync(productId, false, result.ErrorMessage, null, [], stopwatch.Elapsed);
                 return ScrapingResult.CreateError(result.ErrorMessage ?? "Unknown error");
             }
             
@@ -138,20 +149,23 @@ public class StoreScrapingService : IStoreScrapingService
             }
 
             // 7. Log execution
+            stopwatch.Stop();
             await LogExecutionAsync(
-                productId, 
-                true, 
-                null, 
-                notificationHistory?.Id, 
+                productId,
+                true,
+                null,
+                notificationHistory?.Id,
                 product.ProductSkus
                     .Where(x => result.AvailableProductSkus.Contains(x.Sku))
-                    .ToList());
+                    .ToList(),
+                stopwatch.Elapsed);
 
             return ScrapingResult.CreateSuccess(result.AvailableProductSkus.Count);
         }
         catch (Exception ex)
         {
-            await LogExecutionAsync(productId, false, ex.Message, null, []);
+            stopwatch.Stop();
+            await LogExecutionAsync(productId, false, ex.Message, null, [], stopwatch.Elapsed);
             return ScrapingResult.CreateError($"Exception: {ex.Message}");
         }
     }
@@ -166,7 +180,7 @@ public class StoreScrapingService : IStoreScrapingService
         };
     }
 
-    private async Task LogExecutionAsync(int productId, bool success, string? errorMessage, int? notificationHistoryId, List<ProductSku> productSkusFound)
+    private async Task LogExecutionAsync(int productId, bool success, string? errorMessage, int? notificationHistoryId, List<ProductSku> productSkusFound, TimeSpan duration)
     {
         try
         {
@@ -177,7 +191,8 @@ public class StoreScrapingService : IStoreScrapingService
                 ExecutedAt = DateTime.UtcNow,
                 Success = success,
                 ErrorMessage = errorMessage,
-                NotificationHistoryId = notificationHistoryId
+                NotificationHistoryId = notificationHistoryId,
+                Duration = duration
             });
 
             await _dbContext.SaveChangesAsync();

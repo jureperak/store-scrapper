@@ -232,17 +232,49 @@
                     <thead>
                         <tr>
                             <th>Date</th>
+                            <th>Interval</th>
                             <th>Status</th>
+                            <th>Duration</th>
                             <th>Products Found</th>
                             <th>Notifications Sent</th>
                             <th>Error Message</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var log in Model.JobExecutionLogs)
+                        @for (int i = 0; i < Model.JobExecutionLogs.Count; i++)
                         {
+                            var log = Model.JobExecutionLogs[i];
+                            var previousLog = i < Model.JobExecutionLogs.Count - 1 ? Model.JobExecutionLogs[i + 1] : null;
+                            var interval = previousLog != null ? (log.ExecutedAt - previousLog.ExecutedAt) : (TimeSpan?)null;
+
                             <tr>
                                 <td>@log.ExecutedAt.ToLocalTime().ToString("u")</td>
+                                <td>
+                                    @if (interval.HasValue)
+                                    {
+                                        var totalSeconds = interval.Value.TotalSeconds;
+                                        if (totalSeconds < 60)
+                                        {
+                                            <span class="text-muted small">@($"+{totalSeconds:F1}s")</span>
+                                        }
+                                        else if (totalSeconds < 3600)
+                                        {
+                                            var minutes = (int)(totalSeconds / 60);
+                                            var seconds = (int)(totalSeconds % 60);
+                                            <span class="text-muted small">@($"+{minutes}m {seconds}s")</span>
+                                        }
+                                        else
+                                        {
+                                            var hours = (int)(totalSeconds / 3600);
+                                            var minutes = (int)((totalSeconds % 3600) / 60);
+                                            <span class="text-muted small">@($"+{hours}h {minutes}m")</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">-</span>
+                                    }
+                                </td>
                                 <td>
                                     @if (log.Success)
                                     {
@@ -253,9 +285,23 @@
                                         <span class="badge bg-danger">✗ Failed</span>
                                     }
                                 </td>
+                                <td>
+                                    @if (log.Duration.TotalSeconds < 1)
+                                    {
+                                        <span class="text-muted">@($"{log.Duration.TotalMilliseconds:F0}ms")</span>
+                                    }
+                                    else if (log.Duration.TotalSeconds < 60)
+                                    {
+                                        <span class="text-muted">@($"{log.Duration.TotalSeconds:F2}s")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">@($"{log.Duration.Minutes}m {log.Duration.Seconds}s")</span>
+                                    }
+                                </td>
                                 <td>@log.NotificationHistoryId.HasValue</td>
                                 @* Not correct 100% *@
-                                <td>@log.NotificationHistoryId.HasValue</td> 
+                                <td>@log.NotificationHistoryId.HasValue</td>
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(log.ErrorMessage))
                                     {
