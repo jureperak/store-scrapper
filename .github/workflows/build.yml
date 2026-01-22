@@ -1,0 +1,74 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/jureperak/store-scrapper
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build
+    runs-on: self-hosted
+
+    steps:
+      - name: Pull latest image
+        run: docker pull ghcr.io/jureperak/store-scrapper:latest
+
+      - name: Stop and remove old container
+        run: |
+          docker stop store-scrapper || true
+          docker rm store-scrapper || true
+
+      - name: Run new container
+        run: |
+          docker run -d \
+            -p 8080:8080 \
+            -e ConnectionStrings__DefaultConnection="${{ secrets.CONNECTIONSTRINGS_DEFAULTCONNECTION }}" \
+            -e ConnectionStrings__HangfireConnection="${{ secrets.CONNECTIONSTRINGS_HANGFIRECONNECTION }}" \
+            -e Mailgun__ApiKey="${{ secrets.MAILGUN_APIKEY }}" \
+            -e Mailgun__Domain="${{ secrets.MAILGUN_DOMAIN }}" \
+            -e Mailgun__BaseUrl="${{ secrets.MAILGUN_BASEURL }}" \
+            -e Mailgun__Recipients="${{ secrets.MAILGUN_RECIPIENTS }}" \
+            -e Twilio__AccountSid="${{ secrets.TWILIO_ACCOUNTSID }}" \
+            -e Twilio__AccountToken="${{ secrets.TWILIO_ACCOUNTTOKEN }}" \
+            -e Twilio__SendToNumber="${{ secrets.TWILIO_SENDTONUMBER }}" \
+            -e Twilio__SendFromNumber="${{ secrets.TWILIO_SENDFROMNUMBER }}" \
+            -e App__BaseUrl="${{ secrets.APP_BASEURL }}" \
+            -e ASPNETCORE_ENVIRONMENT=Production \
+            --name store-scrapper \
+            --restart unless-stopped \
+            ghcr.io/jureperak/store-scrapper:latest
