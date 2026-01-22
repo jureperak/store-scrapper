@@ -57,6 +57,8 @@ jobs:
         run: |
           docker run -d \
             -p 8080:8080 \
+            --init \
+            --ipc=host \
             -e ConnectionStrings__DefaultConnection="${{ secrets.CONNECTIONSTRINGS_DEFAULTCONNECTION }}" \
             -e ConnectionStrings__HangfireConnection="${{ secrets.CONNECTIONSTRINGS_HANGFIRECONNECTION }}" \
             -e Mailgun__ApiKey="${{ secrets.MAILGUN_APIKEY }}" \

@@ -14,19 +14,22 @@ RUN dotnet build -c Release -o /app/build
 FROM build AS publish
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+# Runtime stage - use Playwright image as base (pinned version as recommended)
+FROM mcr.microsoft.com/playwright:v1.57.0-noble AS final
 WORKDIR /app
 
-# Copy published app first
-COPY --from=publish /app/publish .
+# Install .NET 10 Runtime
+RUN apt-get update && \
+    apt-get install -y wget && \
+    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh && \
+    chmod +x dotnet-install.sh && \
+    ./dotnet-install.sh --channel 10.0 --runtime aspnetcore --install-dir /usr/share/dotnet && \
+    ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet && \
+    rm dotnet-install.sh && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Playwright CLI and browsers with dependencies
-# The --with-deps flag will install all required system dependencies automatically
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
-RUN dotnet tool install --global Microsoft.Playwright.CLI
-ENV PATH="${PATH}:/root/.dotnet/tools"
-RUN playwright install --with-deps chromium
+# Copy published app
+COPY --from=publish /app/publish .
 
 # Expose port
 EXPOSE 8080
