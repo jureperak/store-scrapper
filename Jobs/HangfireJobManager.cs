@@ -9,17 +9,17 @@ public class HangfireJobManager
     /// </summary>
     public static void SetupRecurringJobs()
     {
-        // Run coordinator every minute to check which products need scraping
+        // Run coordinator every 10 seconds to check which products need scraping
         RecurringJob.AddOrUpdate<ScrapingCoordinatorJob>(
             "scraping-coordinator",
             job => job.CoordinateAsync(),
-            Cron.Minutely, // Runs every minute
+            "*/10 * * * * *", // Every 10 seconds
             new RecurringJobOptions
             {
                 TimeZone = TimeZoneInfo.Utc
             });
 
-        Console.WriteLine("[Hangfire] Coordinator job set up - runs every minute");
+        Console.WriteLine("[Hangfire] Coordinator job set up - runs every 10 seconds");
     }
 
     /// <summary>
