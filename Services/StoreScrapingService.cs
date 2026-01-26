@@ -111,7 +111,7 @@ public class StoreScrapingService : IStoreScrapingService
                     {
                         CreatedAt = DateTime.UtcNow,
                         ReEnableUrl = $"{_appOptions.BaseUrl}/productsku/{Guid.NewGuid()}/reactivate",
-                        ValidTo = DateTime.UtcNow.AddMinutes(30),
+                        ValidTo = DateTime.UtcNow.AddHours(6),
                         IsUsed = false,
                     });
                 }
