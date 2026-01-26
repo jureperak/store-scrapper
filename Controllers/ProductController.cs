@@ -11,13 +11,11 @@ namespace StoreScrapper.Controllers;
 public class ProductController : Controller
 {
     private readonly AppDbContext _dbContext;
-    private readonly HangfireJobManager _jobManager;
     private readonly IProductPageScraperService _scraperService;
 
-    public ProductController(AppDbContext dbContext, HangfireJobManager jobManager, IProductPageScraperService scraperService)
+    public ProductController(AppDbContext dbContext, IProductPageScraperService scraperService)
     {
         _dbContext = dbContext;
-        _jobManager = jobManager;
         _scraperService = scraperService;
     }
 
@@ -111,10 +109,7 @@ public class ProductController : Controller
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        // Schedule Hangfire job
-        _jobManager.ScheduleStoreJob(product);
-        await _dbContext.SaveChangesAsync();
-
+        // Coordinator will automatically pick up this product on next run
         TempData["Success"] = "Product created successfully!";
         return RedirectToAction(nameof(Index));
     }
@@ -238,9 +233,7 @@ public class ProductController : Controller
             }
         }
 
-        // Reschedule Hangfire job with new settings
-        _jobManager.ScheduleStoreJob(product);
-
+        // Coordinator will automatically use updated settings on next run
         await _dbContext.SaveChangesAsync();
 
         TempData["Success"] = "Product updated successfully!";
@@ -287,9 +280,7 @@ public class ProductController : Controller
         product.IsEnabled = !product.IsEnabled;
         product.UpdatedAt = DateTime.UtcNow;
 
-        // Update Hangfire job (will add if enabled, remove if disabled)
-        _jobManager.ScheduleStoreJob(product);
-
+        // Coordinator will automatically pick up enabled/disabled status
         await _dbContext.SaveChangesAsync();
 
         TempData["Success"] = $"Product {(product.IsEnabled ? "enabled" : "disabled")} successfully!";
@@ -384,6 +375,28 @@ public class ProductController : Controller
                 message = $"Server error: {ex.Message}"
             });
         }
+    }
+
+    /// <summary>
+    /// Pauses all background scraping jobs
+    /// </summary>
+    [HttpPost]
+    public IActionResult PauseAllScraping()
+    {
+        HangfireJobManager.PauseAllScraping();
+        TempData["Success"] = "All scraping has been paused. Background jobs will not run until resumed.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Resumes all background scraping jobs
+    /// </summary>
+    [HttpPost]
+    public IActionResult ResumeAllScraping()
+    {
+        HangfireJobManager.ResumeAllScraping();
+        TempData["Success"] = "All scraping has been resumed. Background jobs will run normally.";
+        return RedirectToAction(nameof(Index));
     }
 }
 
