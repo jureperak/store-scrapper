@@ -45,3 +45,4 @@ next-env.d.ts
 
 # development appsettings
 appsettings.Development.json
+.idea
