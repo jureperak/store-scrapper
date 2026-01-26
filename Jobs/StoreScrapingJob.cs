@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using StoreScrapper.Data;
+using StoreScrapper.Models.Entities;
 using StoreScrapper.Services;
 
 namespace StoreScrapper.Jobs;
@@ -25,24 +26,35 @@ public class ScrapingCoordinatorJob
     {
         var now = DateTime.UtcNow;
 
-        // Find products that are:
-        // 1. Enabled
-        // 2. Due for next check (LastCheckedAt + Interval <= Now)
-        var productsDue = await _dbContext.Products
-            .Include(x => x.JobExecutionLogs.OrderByDescending(l => l.ExecutedAt).Take(1))
+        // Find all enabled products
+        var enabledProducts = await _dbContext.Products
             .Where(x => x.IsEnabled)
             .ToListAsync();
 
-        var productsToScrape = productsDue
-            .Where(p =>
-            {
-                var lastExecution = p.JobExecutionLogs.FirstOrDefault();
-                if (lastExecution == null) return true; // Never run, scrape immediately
+        var productsToScrape = new List<Product>();
 
-                var nextCheckTime = lastExecution.ExecutedAt.AddSeconds(p.CheckIntervalSeconds);
-                return nextCheckTime <= now;
-            })
-            .ToList();
+        foreach (var product in enabledProducts)
+        {
+            // Get last execution for this product
+            var lastExecution = await _dbContext.JobExecutionLogs
+                .Where(x => x.ProductId == product.Id)
+                .OrderByDescending(x => x.ExecutedAt)
+                .FirstOrDefaultAsync();
+
+            // Never run before, or due for next check
+            if (lastExecution == null)
+            {
+                productsToScrape.Add(product);
+            }
+            else
+            {
+                var nextCheckTime = lastExecution.ExecutedAt.AddSeconds(product.CheckIntervalSeconds);
+                if (nextCheckTime <= now)
+                {
+                    productsToScrape.Add(product);
+                }
+            }
+        }
 
         if (productsToScrape.Any())
         {
