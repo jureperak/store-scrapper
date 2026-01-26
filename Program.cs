@@ -42,6 +42,7 @@ builder.Services.AddHangfire(config =>
 builder.Services.AddHangfireServer((options =>
 {
     options.SchedulePollingInterval = TimeSpan.FromMilliseconds(500);
+    options.WorkerCount = 20;
 }));
 
 // Configure options
