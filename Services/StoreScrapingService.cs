@@ -41,8 +41,9 @@ public class StoreScrapingService : IStoreScrapingService
             var product = await _dbContext.Products
                 .Include(x => x.ProductSkus
                     .Where(y => !y.TemporaryDisabled))
-                .ThenInclude(x => x.ProductSkuReActivations)
-                .Include(x => x.Adapter)                
+                .ThenInclude(x => x.ProductSkuReActivations
+                    .Where(r => !r.IsUsed))
+                .Include(x => x.Adapter)
                 .Where(x => x.Id == productId)
                 .FirstOrDefaultAsync();
             

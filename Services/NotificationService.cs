@@ -53,7 +53,7 @@ public class NotificationService : INotificationService
 
         var skuOrSkus = skusAvailable.Count > 1 ? "skus" : "sku";
         var skuAvailable = string.Join("\n", skusAvailable
-            .Select(x => $"{x.Name}: {x.Sku} => We will disable sending for this SKU until you reactivate at {x.ProductSkuReActivations.Single().ReEnableUrl}. You can reactivate in 30minutes. ({DateTime.UtcNow.AddMinutes(30):u})"));
+            .Select(x => $"{x.Name}: {x.Sku} => We will disable sending for this SKU until you reactivate at {x.ProductSkuReActivations.OrderByDescending(r => r.CreatedAt).First().ReEnableUrl}. You can reactivate in 30minutes. ({DateTime.UtcNow.AddMinutes(30):u})"));
 
         var body = $"Dostupno:\n{product.ProductPageUrl}\n\n{skuOrSkus}:\n{skuAvailable}";
         request.AddParameter("text", body);
@@ -74,8 +74,8 @@ public class NotificationService : INotificationService
         
         var skuOrSkus = skusAvailable.Count > 1 ? "skus" : "sku";
         var skuAvailable = string.Join("\n", skusAvailable
-            .Select(x => $"{x.Name}: _{x.Sku}_ => We will disable sending for this SKU until you reactivate at {x.ProductSkuReActivations.Single().ReEnableUrl}. You can reactivate in 30minutes. ({DateTime.UtcNow.AddMinutes(30):u})"));
-        
+            .Select(x => $"{x.Name}: _{x.Sku}_ => We will disable sending for this SKU until you reactivate at {x.ProductSkuReActivations.OrderByDescending(r => r.CreatedAt).First().ReEnableUrl}. You can reactivate in 30minutes. ({DateTime.UtcNow.AddMinutes(30):u})"));
+
         messageOptions.Body = $"*Hurry!!!*\n\nDostupno:\n{product.ProductPageUrl}\n\n{skuOrSkus}:\n{skuAvailable}";
 
         var message = await MessageResource.CreateAsync(messageOptions);
