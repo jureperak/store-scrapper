@@ -24,5 +24,7 @@ public class ProductSku
 
     public List<ProductSkuReActivation> ProductSkuReActivations { get; set; } = [];
     
+    public List<JobExecutionLog> JobExecutionLogs { get; set; } = [];
+    
     public List<NotificationHistory> NotificationHistories { get; set; } = new();
 }

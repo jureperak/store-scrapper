@@ -92,7 +92,6 @@ public class StoreScrapingService : IStoreScrapingService
             // 6. Send notifications for new products
             if (result.AvailableProductSkus.Any())
             {
-                
                 var productSkusFound = product.ProductSkus
                     .Where(x => result.AvailableProductSkus.Contains(x.Sku))
                     .ToList();
