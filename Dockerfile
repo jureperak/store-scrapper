@@ -33,11 +33,11 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh && \
 COPY --from=publish /app/publish .
 
 # Expose port
-EXPOSE 8080
+EXPOSE 3000
 
 # ADD: virtual display
 ENV DISPLAY=:99
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_URLS=http://+:3000
 
 # CHANGE: start Xvfb before app
 ENTRYPOINT ["bash", "-c", "Xvfb :99 -screen 0 1920x1080x24 & dotnet StoreScrapper.dll"]

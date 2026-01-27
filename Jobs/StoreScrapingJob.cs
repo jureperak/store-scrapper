@@ -18,21 +18,23 @@ public class ScrapingCoordinatorJob
     }
 
     /// <summary>
-    /// Runs every 5 seconds, enqueues all enabled products for scraping
+    /// Runs every 5 seconds, enqueues enabled products that have active SKUs
     /// </summary>
     [AutomaticRetry(Attempts = 1)]
     public async Task CoordinateAsync()
     {
-        var enabledProducts = await _dbContext.Products
+        // Only get products that are enabled AND have at least one active SKU
+        var productsToScrape = await _dbContext.Products
             .Where(x => x.IsEnabled)
+            .Where(x => x.ProductSkus.Any(sku => !sku.TemporaryDisabled))
             .Select(x => x.Id)
             .ToListAsync();
 
-        if (enabledProducts.Any())
+        if (productsToScrape.Any())
         {
-            Console.WriteLine($"[Coordinator] Enqueuing {enabledProducts.Count} products for scraping");
+            Console.WriteLine($"[Coordinator] Enqueuing {productsToScrape.Count} products with active SKUs");
 
-            foreach (var productId in enabledProducts)
+            foreach (var productId in productsToScrape)
             {
                 // Enqueue job for immediate execution
                 BackgroundJob.Enqueue<StoreScrapingJob>(job => job.ExecuteAsync(productId));
@@ -40,7 +42,7 @@ public class ScrapingCoordinatorJob
         }
         else
         {
-            Console.WriteLine("[Coordinator] No enabled products to scrape");
+            Console.WriteLine("[Coordinator] No products with active SKUs to scrape");
         }
     }
 }
