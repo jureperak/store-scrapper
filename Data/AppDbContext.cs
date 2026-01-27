@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using StoreScrapper.Models.Entities;
 
 namespace StoreScrapper.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext : DbContext, IDataProtectionKeyContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -20,6 +21,9 @@ public class AppDbContext : DbContext
     public DbSet<NotificationHistory> NotificationHistory { get; set; }
 
     public DbSet<JobExecutionLog> JobExecutionLogs { get; set; }
+
+    // Data protection keys for antiforgery tokens
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

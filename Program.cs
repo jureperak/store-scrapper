@@ -2,6 +2,7 @@ using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
 using Hangfire.Storage.SQLite;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using StoreScrapper.Adapters;
 using StoreScrapper.Data;
@@ -21,6 +22,10 @@ builder.Services.AddDbContext<AppDbContext>((_, options) =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
         .UseSnakeCaseNamingConvention();
 });
+
+// Configure data protection to persist keys in database
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<AppDbContext>();
 
 // Add Hangfire with PostgreSQL storage
 builder.Services.AddHangfire(config =>
