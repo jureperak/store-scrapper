@@ -1,115 +1,79 @@
 using Hangfire;
-using Microsoft.EntityFrameworkCore;
-using StoreScrapper.Data;
+using Hangfire.Storage;
 
 namespace StoreScrapper.Jobs;
 
-public class HangfireJobManager
+public static class HangfireJobManager
 {
-    private readonly AppDbContext _dbContext;
-
-    public HangfireJobManager(AppDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
     /// <summary>
-    /// Sets up individual recurring jobs for each enabled product
+    /// Cleans up ALL Hangfire jobs and sets up the coordinator
     /// </summary>
-    public async Task SetupRecurringJobsAsync()
+    public static void SetupRecurringJobs()
     {
-        Console.WriteLine("[Hangfire] Cleaning up old recurring jobs...");
+        Console.WriteLine("[Hangfire] Cleaning up all existing jobs...");
 
-        // Remove ALL existing recurring jobs (clean slate on startup)
-        var allProducts = await _dbContext.Products.ToListAsync();
-        foreach (var product in allProducts)
+        // Clean up recurring jobs
+        using (var connection = JobStorage.Current.GetConnection())
         {
-            RemoveProductJob(product.Id);
+            foreach (var recurringJob in connection.GetRecurringJobs())
+            {
+                RecurringJob.RemoveIfExists(recurringJob.Id);
+                Console.WriteLine($"[Hangfire] Removed recurring job: {recurringJob.Id}");
+            }
         }
 
-        // Also remove any old coordinator job if it exists
-        RecurringJob.RemoveIfExists("scraping-coordinator");
-
-        Console.WriteLine("[Hangfire] Setting up recurring jobs for enabled products...");
-
-        var enabledProducts = allProducts.Where(x => x.IsEnabled).ToList();
-
-        foreach (var product in enabledProducts)
+        // Clean up scheduled jobs
+        var monitor = JobStorage.Current.GetMonitoringApi();
+        var scheduledJobs = monitor.ScheduledJobs(0, int.MaxValue);
+        foreach (var job in scheduledJobs)
         {
-            ScheduleProductJob(product.Id, product.CheckIntervalSeconds);
+            BackgroundJob.Delete(job.Key);
         }
+        Console.WriteLine($"[Hangfire] Removed {scheduledJobs.Count} scheduled jobs");
 
-        Console.WriteLine($"[Hangfire] Set up {enabledProducts.Count} recurring jobs");
-    }
+        // Clean up enqueued jobs
+        var enqueuedJobs = monitor.EnqueuedJobs("default", 0, int.MaxValue);
+        foreach (var job in enqueuedJobs)
+        {
+            BackgroundJob.Delete(job.Key);
+        }
+        Console.WriteLine($"[Hangfire] Removed {enqueuedJobs.Count} enqueued jobs");
 
-    /// <summary>
-    /// Schedules or updates a recurring job for a specific product
-    /// </summary>
-    public static void ScheduleProductJob(int productId, int intervalSeconds)
-    {
-        var jobId = $"product-{productId}";
-
-        // Generate cron expression based on interval
-        var cronExpression = GenerateCronExpression(intervalSeconds);
-
-        RecurringJob.AddOrUpdate<StoreScrapingJob>(
-            jobId,
-            job => job.ExecuteAsync(productId),
-            cronExpression,
+        // Set up coordinator job - runs every 5 seconds
+        RecurringJob.AddOrUpdate<ScrapingCoordinatorJob>(
+            "scraping-coordinator",
+            job => job.CoordinateAsync(),
+            "*/5 * * * * *", // Every 5 seconds
             new RecurringJobOptions
             {
                 TimeZone = TimeZoneInfo.Utc
             });
 
-        Console.WriteLine($"[Product {productId}] Recurring job scheduled - runs every {intervalSeconds}s");
+        Console.WriteLine("[Hangfire] Coordinator job set up - runs every 5 seconds");
     }
 
     /// <summary>
-    /// Removes a product's recurring job
+    /// Pauses all scraping by removing the coordinator job
     /// </summary>
-    public static void RemoveProductJob(int productId)
+    public static void PauseAllScraping()
     {
-        var jobId = $"product-{productId}";
-        RecurringJob.RemoveIfExists(jobId);
-        Console.WriteLine($"[Product {productId}] Recurring job removed");
+        RecurringJob.RemoveIfExists("scraping-coordinator");
+        Console.WriteLine("[Hangfire] All scraping paused (coordinator removed)");
     }
 
     /// <summary>
-    /// Pauses all scraping by removing all product jobs
+    /// Resumes scraping by recreating the coordinator job
     /// </summary>
-    public static async Task PauseAllScrapingAsync(AppDbContext dbContext)
+    public static void ResumeAllScraping()
     {
-        var products = await dbContext.Products.ToListAsync();
-        foreach (var product in products)
-        {
-            RemoveProductJob(product.Id);
-        }
-        Console.WriteLine("[Hangfire] All scraping paused");
-    }
-
-    /// <summary>
-    /// Resumes scraping by recreating all jobs
-    /// </summary>
-    public async Task ResumeAllScrapingAsync()
-    {
-        await SetupRecurringJobsAsync();
-        Console.WriteLine("[Hangfire] Scraping resumed");
-    }
-
-    /// <summary>
-    /// Generates a cron expression based on interval in seconds
-    /// </summary>
-    private static string GenerateCronExpression(int intervalSeconds)
-    {
-        return intervalSeconds switch
-        {
-            < 60 when 60 % intervalSeconds == 0 => $"*/{intervalSeconds} * * * * *", // Every N seconds (if divides 60)
-            60 => Cron.Minutely(),
-            120 => "*/2 * * * *",
-            180 => "*/3 * * * *",
-            300 => "*/5 * * * *",
-            600 => "*/10 * * * *",
-            _ => Cron.Minutely() // Default fallback
-        };
+        RecurringJob.AddOrUpdate<ScrapingCoordinatorJob>(
+            "scraping-coordinator",
+            job => job.CoordinateAsync(),
+            "*/5 * * * * *",
+            new RecurringJobOptions
+            {
+                TimeZone = TimeZoneInfo.Utc
+            });
+        Console.WriteLine("[Hangfire] Scraping resumed (coordinator recreated)");
     }
 }

@@ -109,12 +109,7 @@ public class ProductController : Controller
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        // Schedule recurring job for this product
-        if (product.IsEnabled)
-        {
-            HangfireJobManager.ScheduleProductJob(product.Id, product.CheckIntervalSeconds);
-        }
-
+        // Coordinator will automatically pick up enabled products
         TempData["Success"] = "Product created successfully!";
         return RedirectToAction(nameof(Index));
     }
@@ -240,15 +235,7 @@ public class ProductController : Controller
 
         await _dbContext.SaveChangesAsync();
 
-        // Update recurring job with new settings
-        if (product.IsEnabled)
-        {
-            HangfireJobManager.ScheduleProductJob(product.Id, product.CheckIntervalSeconds);
-        }
-        else
-        {
-            HangfireJobManager.RemoveProductJob(product.Id);
-        }
+        // Coordinator will automatically handle enabled/disabled products
 
         TempData["Success"] = "Product updated successfully!";
         return RedirectToAction(nameof(Index));
@@ -296,15 +283,7 @@ public class ProductController : Controller
 
         await _dbContext.SaveChangesAsync();
 
-        // Update recurring job based on enabled status
-        if (product.IsEnabled)
-        {
-            HangfireJobManager.ScheduleProductJob(product.Id, product.CheckIntervalSeconds);
-        }
-        else
-        {
-            HangfireJobManager.RemoveProductJob(product.Id);
-        }
+        // Coordinator will automatically handle enabled/disabled products
 
         TempData["Success"] = $"Product {(product.IsEnabled ? "enabled" : "disabled")} successfully!";
         return RedirectToAction(nameof(Index));
@@ -404,9 +383,9 @@ public class ProductController : Controller
     /// Pauses all background scraping jobs
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> PauseAllScraping()
+    public IActionResult PauseAllScraping()
     {
-        await HangfireJobManager.PauseAllScrapingAsync(_dbContext);
+        HangfireJobManager.PauseAllScraping();
         TempData["Success"] = "All scraping has been paused. Background jobs will not run until resumed.";
         return RedirectToAction(nameof(Index));
     }
@@ -415,10 +394,9 @@ public class ProductController : Controller
     /// Resumes all background scraping jobs
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> ResumeAllScraping()
+    public IActionResult ResumeAllScraping()
     {
-        var jobManager = new HangfireJobManager(_dbContext);
-        await jobManager.ResumeAllScrapingAsync();
+        HangfireJobManager.ResumeAllScraping();
         TempData["Success"] = "All scraping has been resumed. Background jobs will run normally.";
         return RedirectToAction(nameof(Index));
     }

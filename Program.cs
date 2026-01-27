@@ -62,13 +62,13 @@ builder.Services.AddHttpClient();
 builder.Services.AddTransient<INotificationService, NotificationService>();
 builder.Services.AddTransient<IStoreScrapingService, StoreScrapingService>();
 builder.Services.AddTransient<IProductPageScraperService, ProductPageScraperService>();
-builder.Services.AddScoped<HangfireJobManager>();
 
 // Register adapters as scoped
 builder.Services.AddTransient<IZaraAdapter, ZaraAdapter>();
 builder.Services.AddTransient<IPullAndBearAdapter, PullAndBearAdapter>();
 
 // Register Hangfire jobs
+builder.Services.AddScoped<ScrapingCoordinatorJob>();
 builder.Services.AddScoped<StoreScrapingJob>();
 
 var app = builder.Build();
@@ -99,12 +99,8 @@ app.MapControllerRoute(
 var twilioOptions = builder.Configuration.GetSection(TwilioOptions.SectionName).Get<TwilioOptions>();
 TwilioClient.Init(twilioOptions!.AccountSid, twilioOptions!.AccountToken);
 
-// Setup recurring jobs for all enabled products
-using (var scope = app.Services.CreateScope())
-{
-    var jobManager = scope.ServiceProvider.GetRequiredService<HangfireJobManager>();
-    await jobManager.SetupRecurringJobsAsync();
-}
+// Clean up all jobs and setup coordinator
+HangfireJobManager.SetupRecurringJobs();
 
 app.Run();
 
