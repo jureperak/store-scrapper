@@ -49,20 +49,30 @@ jobs:
     environment: Production
 
     steps:
+      - name: Ensure docker network exists
+        run: |
+          docker network inspect "${{ vars.DOCKER_NETWORK }}" >/dev/null 2>&1 || \
+          docker network create "${{ vars.DOCKER_NETWORK }}"         
+    
       - name: Pull latest image
-        run: docker pull ghcr.io/jureperak/store-scrapper:latest
+        run: |
+          docker pull ghcr.io/jureperak/store-scrapper:latest
 
       - name: Stop and remove old container
         run: |
-          docker stop store-scrapper || true
-          docker rm store-scrapper || true
+          docker stop "${{ vars.STORE_SCRAPPER_CONTAINER }}" || true
+          docker rm "${{ vars.STORE_SCRAPPER_CONTAINER }}" || true
 
       - name: Run new container
         run: |
+          docker rm -f "${{ vars.STORE_SCRAPPER_CONTAINER }}" 2>/dev/null || true
+
           docker run -d \
             -p 8080:8080 \
             --init \
             --ipc=host \
+            --name "${{ vars.STORE_SCRAPPER_CONTAINER }}" \
+            --network "${{ vars.DOCKER_NETWORK }}" \
             -e ConnectionStrings__DefaultConnection="${{ secrets.CONNECTIONSTRINGS_DEFAULTCONNECTION }}" \
             -e ConnectionStrings__HangfireConnection="${{ secrets.CONNECTIONSTRINGS_HANGFIRECONNECTION }}" \
             -e Mailgun__ApiKey="${{ secrets.MAILGUN_APIKEY }}" \
@@ -75,7 +85,12 @@ jobs:
             -e Twilio__SendFromNumber="${{ secrets.TWILIO_SENDFROMNUMBER }}" \
             -e App__BaseUrl="${{ vars.APP_BASEURL }}" \
             -e ASPNETCORE_ENVIRONMENT=Production \
-            --name store-scrapper \
             --restart unless-stopped \
             ghcr.io/jureperak/store-scrapper:latest
+
+      - name: Status
+        run: |
+          docker ps --filter "name=${{ vars.STORE_SCRAPPER_CONTAINER }}"
+          docker logs "${{ vars.STORE_SCRAPPER_CONTAINER }}" --tail 20
+
 
