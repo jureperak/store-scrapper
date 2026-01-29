@@ -84,13 +84,9 @@ jobs:
             -e Twilio__SendToNumber="${{ secrets.TWILIO_SENDTONUMBER }}" \
             -e Twilio__SendFromNumber="${{ secrets.TWILIO_SENDFROMNUMBER }}" \
             -e App__BaseUrl="${{ vars.APP_BASEURL }}" \
+            -e Logging__LogLevel__Default=Information \
+            -e Logging__LogLevel__Microsoft.AspNetCore=Information \
+            -e Logging__LogLevel__Microsoft.Hosting.Lifetime=Information \
             -e ASPNETCORE_ENVIRONMENT=Production \
             --restart unless-stopped \
             ghcr.io/jureperak/store-scrapper:latest
-
-      - name: Status
-        run: |
-          docker ps --filter "name=${{ vars.STORE_SCRAPPER_CONTAINER }}"
-          docker logs "${{ vars.STORE_SCRAPPER_CONTAINER }}" --tail 20
-
-
