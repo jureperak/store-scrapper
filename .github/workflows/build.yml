@@ -73,8 +73,9 @@ jobs:
             -e Twilio__AccountToken="${{ secrets.TWILIO_ACCOUNTTOKEN }}" \
             -e Twilio__SendToNumber="${{ secrets.TWILIO_SENDTONUMBER }}" \
             -e Twilio__SendFromNumber="${{ secrets.TWILIO_SENDFROMNUMBER }}" \
-            -e App__BaseUrl="${{ secrets.APP_BASEURL }}" \
+            -e App__BaseUrl="${{ vars.APP_BASEURL }}" \
             -e ASPNETCORE_ENVIRONMENT=Production \
             --name store-scrapper \
             --restart unless-stopped \
             ghcr.io/jureperak/store-scrapper:latest
+
