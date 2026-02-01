@@ -1,4 +1,4 @@
-‹# Build stage
+# Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
@@ -39,3 +39,4 @@ ENV ASPNETCORE_URLS=http://+:8080
 
 # CHANGE: start Xvfb before app
 ENTRYPOINT ["xvfb-run", "-a", "-s", "-screen 0 1920x1080x24", "dotnet", "StoreScrapper.dll"]
+
