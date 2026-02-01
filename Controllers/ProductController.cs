@@ -400,6 +400,41 @@ public class ProductController : Controller
         TempData["Success"] = "All scraping has been resumed. Background jobs will run normally.";
         return RedirectToAction(nameof(Index));
     }
+
+    /// <summary>
+    /// Manually reactivates a temporarily disabled ProductSku
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReactivateProductSku(int productSkuId, int productId)
+    {
+        var productSku = await _dbContext.ProductSkus
+            .Include(x => x.ProductSkuReActivations)
+            .Where(x => x.Id == productSkuId)
+            .FirstOrDefaultAsync();
+
+        if (productSku == null)
+        {
+            TempData["Error"] = "Product SKU not found.";
+            return RedirectToAction(nameof(Details), new { id = productId });
+        }
+
+        // Reactivate the ProductSku
+        productSku.TemporaryDisabled = false;
+        productSku.UpdatedAt = DateTime.UtcNow;
+
+        // Mark all associated reactivations as used
+        foreach (var reactivation in productSku.ProductSkuReActivations)
+        {
+            reactivation.IsUsed = true;
+            reactivation.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _dbContext.SaveChangesAsync();
+
+        TempData["Success"] = $"Product SKU '{productSku.Name}' has been reactivated successfully!";
+        return RedirectToAction(nameof(Details), new { id = productId });
+    }
 }
 
 public class ScrapeProductPageRequest

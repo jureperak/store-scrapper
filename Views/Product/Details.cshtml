@@ -74,7 +74,16 @@
                 {
                     if (sku.TemporaryDisabled)
                     {
-                        <span class="badge bg-secondary text-decoration-line-through me-1" title="Temporarily disabled">@sku.Name (SKU: @sku.Sku)</span>
+                        <span class="d-inline-flex align-items-center me-2">
+                            <span class="badge bg-secondary text-decoration-line-through me-1" title="Temporarily disabled">@sku.Name (SKU: @sku.Sku)</span>
+                            <form asp-action="ReactivateProductSku" method="post" class="d-inline">
+                                <input type="hidden" name="productSkuId" value="@sku.Id" />
+                                <input type="hidden" name="productId" value="@Model.Product.Id" />
+                                <button type="submit" class="btn btn-success btn-sm py-0" title="Reactivate this SKU" style="font-size: 0.75rem;">
+                                    <i class="bi bi-arrow-clockwise"></i> Reactivate
+                                </button>
+                            </form>
+                        </span>
                     }
                     else
                     {
