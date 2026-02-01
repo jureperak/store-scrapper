@@ -32,6 +32,7 @@ public class NotificationService : INotificationService
 
     public async Task<string> SendMailAsync(int productId, List<ProductSku> skusAvailable)
     {
+        return "Not sent";
         var product = await _appDbContext.Products
             .Where(x => x.Id == productId)
             .FirstAsync();
