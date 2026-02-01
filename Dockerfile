@@ -38,5 +38,4 @@ EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 
 # CHANGE: start Xvfb before app
-
 ENTRYPOINT ["xvfb-run", "-a", "-s", "-screen 0 1920x1080x24", "dotnet", "StoreScrapper.dll"]
