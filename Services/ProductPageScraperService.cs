@@ -10,10 +10,19 @@ public interface IProductPageScraperService
 
 public class ProductPageScraperService : IProductPageScraperService
 {
+    private readonly ILogger<ProductPageScraperService> _logger;
+
+    public ProductPageScraperService(ILogger<ProductPageScraperService> logger)
+    {
+        _logger = logger;
+    }
+    
     public async Task<ProductPageScraperResult> ScrapeProductPageAsync(string url)
     {
         try
         {
+            _logger.LogInformation("Starting scrape for URL: {Url}", url);
+
             var playwright = await Playwright.CreateAsync();
 
             var browser = await playwright.Chromium.LaunchAsync(new()
@@ -21,6 +30,8 @@ public class ProductPageScraperService : IProductPageScraperService
                 Headless = false,
                 Args = new[] { "--disable-blink-features=AutomationControlled" }
             });
+            
+            _logger.LogInformation("Browser launched for URL: {Url}", url);
 
             var context = await browser.NewContextAsync(new()
             {
@@ -50,6 +61,28 @@ public class ProductPageScraperService : IProductPageScraperService
                 {
                     apiUrls.Add(requestUrl);
                     Console.WriteLine($"Captured API URL: {requestUrl}");
+                    _logger.LogInformation("Captured API URL: {RequestUrl}", requestUrl);
+                }
+            };
+            
+            page.Response += async (_, response) =>
+            {
+                var url = response.Url;
+                if (url.Contains("/itxrest/") || url.Contains("availability"))
+                {
+                    var headers = await response.AllHeadersAsync();
+                    headers.TryGetValue("content-type", out var ct);
+
+                    Console.WriteLine($"API RESP: {response.Status} {ct} {url}");
+                    _logger.LogInformation("API RESP: {Status} {ContentType} {Url}", response.Status, ct, url);
+
+                    // Optional: if HTML, dump first chars to prove it's a block page
+                    if (ct != null && ct.Contains("text/html"))
+                    {
+                        var body = await response.TextAsync();
+                        Console.WriteLine($"HTML SAMPLE: {body.Substring(0, Math.Min(300, body.Length))}");
+                        _logger.LogWarning("HTML SAMPLE: {Sample}", body.Substring(0, Math.Min(300, body.Length)));
+                    }
                 }
             };
 
@@ -62,7 +95,7 @@ public class ProductPageScraperService : IProductPageScraperService
             await page.WaitForSelectorAsync("body");
 
             // Give time for API calls to complete after page load
-            await Task.Delay(3000);
+            await Task.Delay(2000);
 
             // Scrape product information
             var productId = await ScrapeProductIdAsync(page, url);
@@ -107,6 +140,8 @@ public class ProductPageScraperService : IProductPageScraperService
 
             await browser.CloseAsync();
             playwright.Dispose();
+            
+            _logger.LogInformation("Total API URLs captured: {Count}", apiUrls.Count);
 
             return new ProductPageScraperResult
             {
@@ -120,6 +155,8 @@ public class ProductPageScraperService : IProductPageScraperService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error scraping product page: {Message}", ex.Message);
+
             return new ProductPageScraperResult
             {
                 Success = false,
