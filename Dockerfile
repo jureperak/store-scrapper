@@ -17,7 +17,7 @@ RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 FROM mcr.microsoft.com/playwright:v1.57.0-noble AS final
 WORKDIR /app
 
-# ADD: install Xvfb
+# Install Xvfb + wget (unchanged)
 RUN apt-get update && \
     apt-get install -y xvfb wget && \
     rm -rf /var/lib/apt/lists/*
@@ -29,15 +29,10 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh && \
     ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet && \
     rm dotnet-install.sh
 
-# Copy published app
 COPY --from=publish /app/publish .
 
-# Expose port
 EXPOSE 8080
-
-# ADD: virtual display
-ENV DISPLAY=:99
 ENV ASPNETCORE_URLS=http://+:8080
 
-# CHANGE: start Xvfb before app
-ENTRYPOINT ["bash", "-c", "Xvfb :99 -screen 0 1920x1080x24 & dotnet StoreScrapper.dll"]
+# ✅ Run Playwright headed reliably using xvfb-run (auto-picks a free DISPLAY)
+ENTRYPOINT ["xvfb-run", "-a", "-s", "-screen 0 1920x1080x24", "dotnet", "StoreScrapper.dll"]
