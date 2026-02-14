@@ -39,17 +39,17 @@ public static class HangfireJobManager
         }
         Console.WriteLine($"[Hangfire] Removed {enqueuedJobs.Count} enqueued jobs");
 
-        // Set up coordinator job - runs every 5 seconds
+        // Set up coordinator job - runs every 2 seconds
         RecurringJob.AddOrUpdate<ScrapingCoordinatorJob>(
             "scraping-coordinator",
             job => job.CoordinateAsync(),
-            "*/5 * * * * *", // Every 5 seconds
+            "*/2 * * * * *", // Every 2 seconds
             new RecurringJobOptions
             {
                 TimeZone = TimeZoneInfo.Utc
             });
 
-        Console.WriteLine("[Hangfire] Coordinator job set up - runs every 5 seconds");
+        Console.WriteLine("[Hangfire] Coordinator job set up - runs every 2 seconds");
     }
 
     /// <summary>
@@ -69,7 +69,7 @@ public static class HangfireJobManager
         RecurringJob.AddOrUpdate<ScrapingCoordinatorJob>(
             "scraping-coordinator",
             job => job.CoordinateAsync(),
-            "*/5 * * * * *",
+            "*/2 * * * * *",
             new RecurringJobOptions
             {
                 TimeZone = TimeZoneInfo.Utc
